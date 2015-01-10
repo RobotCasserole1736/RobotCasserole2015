@@ -2,6 +2,8 @@
 package org.usfirst.frc.team1736.robot;
 
 import edu.wpi.first.wpilibj.IterativeRobot;
+import edu.wpi.first.wpilibj.Joystick;
+import edu.wpi.first.wpilibj.VictorSP;
 
 /**
  * The VM is configured to automatically run this class, and to call the
@@ -16,8 +18,68 @@ public class Robot extends IterativeRobot {
      * This function is run when the robot is first started up and should be
      * used for any initialization code.
      */
+	//*Constants*
+	
+	//-Component IDS
+	final static int JOY1_INT = 0;
+	
+	final static int LEFTROBOT_FRONTMOTOR_ID = 0;
+	final static int LEFTROBOT_BACKMOTOR_ID = 0;
+	final static int RIGHTROBOT_FRONTMOTOR_ID = 0;
+	final static int RIGHTROBOT_BACKMOTOR_ID = 0;
+	
+	//-Controller Buttons
+	final static int XBOX_A_BUTTON = 1;
+	final static int XBOX_B_BUTTON = 2;
+	final static int XBOX_X_BUTTON = 3;
+	final static int XBOX_Y_BUTTON = 4;
+	final static int XBOX_LEFT_BUTTON = 5;
+	final static int XBOX_RIGHT_BUTTON = 6;
+	final static int XBOX_SELECT_BUTTON = 7;
+	final static int XBOX_START_BUTTON = 8;
+	final static int XBOX_LSTICK_BUTTON = 9;
+	final static int XBOX_RSTICK_BUTTON = 10;
+	
+	//-Controller Axes
+	final static int XBOX_LSTICK_XAXIS = 0;
+	final static int XBOX_LSTICK_YAXIS = 1;
+	final static int XBOX_LTRIGGER_AXIS = 2;
+	final static int XBOX_RTRIGGER_AXIS = 3;
+	final static int XBOX_RSTICK_XAXIS = 4;
+	final static int XBOX_RSTICK_YAXIS = 5;
+	
+	//-Slide Correction Tuning Value
+	final static double slideTune = 100;
+	
+	//*Declaring robot parts*
+	//-Joystick
+	Joystick joy1;
+	
+	//-DriveTrain Motors
+	VictorSP leftRobotMotor_Front;
+	VictorSP leftRobotMotor_Back;
+	VictorSP rightRobotMotor_Front;
+	VictorSP rightRobotMotor_Back;
+	VictorSP slideMotor;
+	
+	//-DriveTrain
+	SlideTrain slideTrain;
+	
+	
     public void robotInit() {
 
+    	//Joystick
+    	joy1 = new Joystick(JOY1_INT);
+    	//Motors
+    	leftRobotMotor_Front = new VictorSP(LEFTROBOT_FRONTMOTOR_ID);
+    	leftRobotMotor_Back = new VictorSP(LEFTROBOT_BACKMOTOR_ID);
+    	rightRobotMotor_Front = new VictorSP(RIGHTROBOT_FRONTMOTOR_ID);
+    	rightRobotMotor_Back = new VictorSP(RIGHTROBOT_BACKMOTOR_ID);
+    	//Drive Train
+    	slideTrain = new SlideTrain(leftRobotMotor_Front, leftRobotMotor_Back, rightRobotMotor_Front, rightRobotMotor_Back, slideMotor);
+    	
+    	
+    	
     }
 
     /**
@@ -31,7 +93,7 @@ public class Robot extends IterativeRobot {
      * This function is called periodically during operator control
      */
     public void teleopPeriodic() {
-        
+        slideTrain.arcadeDrive(joy1.getRawAxis(XBOX_LSTICK_YAXIS), joy1.getRawAxis(XBOX_RSTICK_XAXIS), joy1.getRawAxis(XBOX_LSTICK_XAXIS), slideTune, true);
     }
     
     /**
