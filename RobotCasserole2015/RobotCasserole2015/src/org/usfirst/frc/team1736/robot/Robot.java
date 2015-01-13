@@ -2,6 +2,7 @@
 package org.usfirst.frc.team1736.robot;
 
 import edu.wpi.first.wpilibj.IterativeRobot;
+import edu.wpi.first.wpilibj.Joystick;
 
 /**
  * The VM is configured to automatically run this class, and to call the
@@ -11,13 +12,15 @@ import edu.wpi.first.wpilibj.IterativeRobot;
  * directory.
  */
 public class Robot extends IterativeRobot {
-	//This is a test.  Just a comment to check out commits and stuff.
+	Joystick joy1;
+	PIDTestMotor motor;
     /**
      * This function is run when the robot is first started up and should be
      * used for any initialization code.
      */
     public void robotInit() {
-
+    	joy1 = new Joystick(1);
+    	motor = new PIDTestMotor(1, 0, 0, 1, 1, 20);
     }
 
     /**
@@ -31,7 +34,7 @@ public class Robot extends IterativeRobot {
      * This function is called periodically during operator control
      */
     public void teleopPeriodic() {
-        
+        motor.setSetpoint(joy1.getRawAxis(0) * motor.getStallCurrent());
     }
     
     /**
