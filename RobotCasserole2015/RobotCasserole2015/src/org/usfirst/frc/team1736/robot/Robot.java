@@ -2,6 +2,7 @@
 package org.usfirst.frc.team1736.robot;
 
 import edu.wpi.first.wpilibj.IterativeRobot;
+import edu.wpi.first.wpilibj.command.PIDCommand;
 
 /**
  * The VM is configured to automatically run this class, and to call the
