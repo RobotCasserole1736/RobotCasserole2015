@@ -41,12 +41,17 @@ public class SlideTrain {
             } else {
                 x = -(x * x);
             }
+            if (slideCorrection >= 0.0) {
+                slideCorrection = (slideCorrection * slideCorrection);
+            } else {
+                slideCorrection = -(slideCorrection * slideCorrection);
+            }
 		}
 		
-		m_frontRightMotor.set(limit((y - (slideCorrection * x)) + z));
+		m_frontRightMotor.set(limit((y + (slideCorrection * x)) - z));
 		m_frontLeftMotor.set(limit((y - (slideCorrection * x)) + z));
 		m_backRightMotor.set(limit((y + (slideCorrection * x)) - z));
-		m_backLeftMotor.set(limit((y + (slideCorrection * x)) - z));
+		m_backLeftMotor.set(limit((y - (slideCorrection * x)) + z));
 		m_slideMotor.set(limit(x));
 	}
 	

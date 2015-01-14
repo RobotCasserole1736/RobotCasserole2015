@@ -49,7 +49,7 @@ public class Robot extends IterativeRobot {
 	final static int XBOX_RSTICK_YAXIS = 5;
 	
 	//-Slide Correction Tuning Value
-	final static double slideTune = 100;
+	final static double slideTune = .75;
 	
 	//*Declaring robot parts*
 	//-Joystick
@@ -77,8 +77,6 @@ public class Robot extends IterativeRobot {
     	rightRobotMotor_Back = new VictorSP(RIGHTROBOT_BACKMOTOR_ID);
     	//Drive Train
     	slideTrain = new SlideTrain(leftRobotMotor_Front, leftRobotMotor_Back, rightRobotMotor_Front, rightRobotMotor_Back, slideMotor);
-    	
-    	
     	
     }
 
