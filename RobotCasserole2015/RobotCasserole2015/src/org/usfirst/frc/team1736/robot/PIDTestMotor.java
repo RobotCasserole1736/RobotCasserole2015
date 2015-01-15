@@ -1,7 +1,12 @@
 package org.usfirst.frc.team1736.robot;
 
+import java.util.LinkedList;
+
+import edu.wpi.first.wpilibj.CounterBase.EncodingType;
+import edu.wpi.first.wpilibj.Encoder;
 import edu.wpi.first.wpilibj.PowerDistributionPanel;
 import edu.wpi.first.wpilibj.SpeedController;
+import edu.wpi.first.wpilibj.Talon;
 import edu.wpi.first.wpilibj.VictorSP;
 import edu.wpi.first.wpilibj.command.PIDSubsystem;
 
@@ -10,24 +15,38 @@ import edu.wpi.first.wpilibj.command.PIDSubsystem;
 public class PIDTestMotor extends PIDSubsystem {
 	PowerDistributionPanel pd;
 	SpeedController motor;
+	Encoder encoder;
 	int pdPort;
 	int motorPort;
-	double stallCurrent = 20; //Need to define this based on motor selected
-
-	public PIDTestMotor(double p, double i, double d, int pdPort, int motorPort, double stallCurrent) {
+	double maxSpeed = 500; //Need to define this based on motor selected
+	double speedReadings[] = {0,0,0,0,0,0,0,0,0,0};
+	LinkedList<Double> speedQueue = new LinkedList<Double>();
+	
+	public PIDTestMotor(double p, double i, double d, int motorPort, double maxSpeed) {
 		super("PIDTestMotor", p, i, d);
-		pd = new PowerDistributionPanel();
-		this.pdPort = pdPort;
+		encoder = new Encoder(0, 1, true, EncodingType.k4X);
+		encoder.setDistancePerPulse(1);
 		this.motorPort = motorPort;
-		setInputRange(0, stallCurrent);
-		setOutputRange(-1, 1);
-		motor = new VictorSP(motorPort);
-		this.stallCurrent = stallCurrent;
+		setInputRange(0, maxSpeed);
+		setOutputRange(0, 1);
+		motor = new Talon(motorPort);
+		this.maxSpeed = maxSpeed;
+		for (int idx=0; idx<10; idx++)
+		{
+			speedQueue.offer(0.0);
+		}
 	}
 
 	@Override
 	protected double returnPIDInput() {
-		return pd.getCurrent(pdPort);
+		speedQueue.removeFirst();
+		speedQueue.offer(encoder.getRate());
+		double sum = 0;
+		for(int idx = 0; idx < speedQueue.size(); idx++)
+		{
+			sum += speedQueue.get(idx);
+		}
+		return sum/10;
 	}
 
 	@Override
@@ -41,8 +60,8 @@ public class PIDTestMotor extends PIDSubsystem {
 		
 	}
 	
-	public double getStallCurrent() {
-		return stallCurrent;
+	public double getSpeed() {
+		return encoder.getRate();
 	}
 
 }
