@@ -16,6 +16,12 @@ public class Robot extends IterativeRobot {
      * This function is run when the robot is first started up and should be
      * used for any initialization code.
      */
+	
+	final int LEVEL1 = 625;
+	final int LEVEL2 = 1250;
+	final int LEVEL3 = 1875;
+	final int LEVEL4 = 2500;
+	
     public void robotInit() {
 
     }
