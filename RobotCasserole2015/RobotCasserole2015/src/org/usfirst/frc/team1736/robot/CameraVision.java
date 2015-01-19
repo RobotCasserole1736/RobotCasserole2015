@@ -13,14 +13,14 @@ import edu.wpi.first.wpilibj.vision.AxisCamera;
 
 public class CameraVision 
 {
-	final String RIGHT_CAMERA_IP = "10.17.36.21";
-	final String LEFT_CAMERA_IP = "10.17.36.22";
+	final String RIGHT_CAMERA_IP = "10.17.36.11";
+	final String LEFT_CAMERA_IP = "10.17.36.12";
 	
 	AxisCamera 	cameraLeft = new AxisCamera(LEFT_CAMERA_IP), 
-				cameraRight = new AxisCamera(RIGHT_CAMERA_IP);
+			cameraRight = new AxisCamera(RIGHT_CAMERA_IP);
 	
 	Image 	imageLeft = NIVision.imaqCreateImage(NIVision.ImageType.IMAGE_RGB, 0), 
-			imageRight = NIVision.imaqCreateImage(NIVision.ImageType.IMAGE_RGB, 0);
+		imageRight = NIVision.imaqCreateImage(NIVision.ImageType.IMAGE_RGB, 0);
 	
 	NIVision.Rect rect;
 	NIVision.Point destLoc;
