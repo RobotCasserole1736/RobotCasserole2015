@@ -25,6 +25,8 @@ public class SlideTrain extends PIDSubsystem{
     double K3 = 1;
     double K4 = 1;
     
+    double setPointMultiplier = 1;
+    
     Gyro gyro;
 	
 	public SlideTrain(SpeedController leftFrontMotor, SpeedController leftBackMotor, SpeedController rightFrontMotor, 
@@ -32,8 +34,8 @@ public class SlideTrain extends PIDSubsystem{
 	{
 		super("SlideTrain",P,I,D);
 		m_frontLeftMotor = leftFrontMotor;
-		m_frontRightMotor = leftBackMotor;
-		m_backLeftMotor = rightFrontMotor;
+		m_frontRightMotor = rightFrontMotor;
+		m_backLeftMotor = leftBackMotor;
 		m_backRightMotor = rightBackMotor;
 		m_slideMotor = slideMotor;
 		gyro = new Gyro(GYRO_ID);
@@ -70,9 +72,9 @@ public class SlideTrain extends PIDSubsystem{
             }
 		}
 		
-		m_frontRightMotor.set(limit((y + (slideCorrection * x)) - z));
+		m_frontRightMotor.set((limit((y + (slideCorrection * x)) - z)) * -1);
 		m_frontLeftMotor.set(limit((y - (slideCorrection * x)) + z));
-		m_backRightMotor.set(limit((y + (slideCorrection * x)) - z));
+		m_backRightMotor.set((limit((y + (slideCorrection * x)) - z)) * -1);
 		m_backLeftMotor.set(limit((y - (slideCorrection * x)) + z));
 		m_slideMotor.set(limit(x));
 	}
@@ -85,18 +87,28 @@ public class SlideTrain extends PIDSubsystem{
 		
 		if(R_XAxis > 0.5 && setPoint > 0)
 		{
-			setPoint = (setPoint + (R_XAxis / 10)) % 360;
+			setPoint = (setPoint + (R_XAxis * setPointMultiplier)) % 360;
 		}
 		else if(R_XAxis < -0.5 && setPoint > 0)
 		{
-			setPoint = (setPoint + (R_XAxis / 10)) % 360;
+			setPoint = (setPoint + (R_XAxis * setPointMultiplier)) % 360;
 		}
 		else if(R_XAxis < -0.5 && setPoint == 0)
 		{
-			setPoint = (360 + (R_XAxis / 10)) % 360;
+			setPoint = (360 + (R_XAxis * setPointMultiplier)) % 360;
+		}
+		else if(R_XAxis > 0.5 && setPoint == 0)
+		{
+			setPoint = (setPoint + (R_XAxis * setPointMultiplier)) % 360;
+		}
+		else if(setPoint < 0)
+		{
+			setPoint = (360 + (R_XAxis * setPointMultiplier)) % 360;
 		}
 		
 		setSetpoint(setPoint);
+		
+		System.out.print(setPoint + "\n");
 		
 		double m1_traversal = (joy.getMagnitude() * Math.sin((Math.PI/2) - joy.getDirectionRadians()));
 		double m1_rotational = (((-1) * PIDOutput) * (gyro.pidGet() - setPoint)) * K1;

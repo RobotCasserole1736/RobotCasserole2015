@@ -24,9 +24,10 @@ public class Robot extends IterativeRobot {
 	final static int JOY1_INT = 0;
 	
 	final static int LEFTROBOT_FRONTMOTOR_ID = 0;
-	final static int LEFTROBOT_BACKMOTOR_ID = 0;
-	final static int RIGHTROBOT_FRONTMOTOR_ID = 0;
-	final static int RIGHTROBOT_BACKMOTOR_ID = 0;
+	final static int LEFTROBOT_BACKMOTOR_ID = 1;
+	final static int RIGHTROBOT_FRONTMOTOR_ID = 3;
+	final static int RIGHTROBOT_BACKMOTOR_ID = 2;
+	final static int SLIDE_MOTOR_ID = 4;
 	
 	//-Controller Buttons
 	final static int XBOX_A_BUTTON = 1;
@@ -49,7 +50,7 @@ public class Robot extends IterativeRobot {
 	final static int XBOX_RSTICK_YAXIS = 5;
 	
 	//-Slide Correction Tuning Value
-	final static double slideTune = .75;
+	final static double slideTune = .4;
 	
 	//PID Values
 	final static double P = 0;
@@ -80,6 +81,7 @@ public class Robot extends IterativeRobot {
     	leftRobotMotor_Back = new VictorSP(LEFTROBOT_BACKMOTOR_ID);
     	rightRobotMotor_Front = new VictorSP(RIGHTROBOT_FRONTMOTOR_ID);
     	rightRobotMotor_Back = new VictorSP(RIGHTROBOT_BACKMOTOR_ID);
+    	slideMotor = new VictorSP(SLIDE_MOTOR_ID);
     	//Drive Train
     	slideTrain = new SlideTrain(leftRobotMotor_Front, leftRobotMotor_Back, rightRobotMotor_Front, rightRobotMotor_Back, slideMotor, P, I, D);
     }
@@ -95,7 +97,7 @@ public class Robot extends IterativeRobot {
      * This function is called periodically during operator control
      */
     public void teleopPeriodic() {
-        slideTrain.PIDarcadeDrive(joy1, joy1.getRawAxis(XBOX_LSTICK_YAXIS), joy1.getRawAxis(XBOX_RSTICK_XAXIS), joy1.getRawAxis(XBOX_LSTICK_XAXIS), true);
+        slideTrain.arcadeDrive((-1 *joy1.getRawAxis(XBOX_LSTICK_YAXIS)), joy1.getRawAxis(XBOX_RSTICK_XAXIS), joy1.getRawAxis(XBOX_LSTICK_XAXIS), slideTune, true);   
     }
     
     /**
