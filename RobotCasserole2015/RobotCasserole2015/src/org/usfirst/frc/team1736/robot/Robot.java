@@ -5,6 +5,10 @@ import edu.wpi.first.wpilibj.IterativeRobot;
 import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.VictorSP;
 
+import java.io.*;
+import java.net.*;
+
+
 /**
  * The VM is configured to automatically run this class, and to call the
  * functions corresponding to each mode, as described in the IterativeRobot
@@ -82,6 +86,12 @@ public class Robot extends IterativeRobot {
     	rightRobotMotor_Back = new VictorSP(RIGHTROBOT_BACKMOTOR_ID);
     	//Drive Train
     	slideTrain = new SlideTrain(leftRobotMotor_Front, leftRobotMotor_Back, rightRobotMotor_Front, rightRobotMotor_Back, slideMotor, P, I, D);
+    	try {
+			open_UDP_tx_and_close("Hello! Robot has been initalized!\n");
+		} catch (IOException e) {
+			System.out.print("OOPS! Error while sending udp packet...\n");
+			e.printStackTrace();
+		}
     }
 
     /**
@@ -103,6 +113,20 @@ public class Robot extends IterativeRobot {
      */
     public void testPeriodic() {
     
+    }
+    
+    public void open_UDP_tx_and_close(String sendStr) throws IOException {
+        DatagramSocket clientSocket = new DatagramSocket();
+        InetAddress IPAddress = InetAddress.getByName("10.17.36.199:5801");
+        byte[] sendData = new byte[1024];
+        
+        sendData = sendStr.getBytes();
+        DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPAddress, 9876);
+        clientSocket.send(sendPacket);
+        clientSocket.close();
+        System.out.print("Sent message "+sendStr + "\n");
+
+    	
     }
     
 }
