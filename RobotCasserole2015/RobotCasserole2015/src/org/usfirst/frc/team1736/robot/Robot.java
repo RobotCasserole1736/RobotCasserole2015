@@ -117,11 +117,11 @@ public class Robot extends IterativeRobot {
     
     public void open_UDP_tx_and_close(String sendStr) throws IOException {
         DatagramSocket clientSocket = new DatagramSocket();
-        InetAddress IPAddress = InetAddress.getByName("10.17.36.199:5801");
+        InetAddress IPAddress = InetAddress.getByName("10.17.36.199");
         byte[] sendData = new byte[1024];
         
         sendData = sendStr.getBytes();
-        DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPAddress, 9876);
+        DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPAddress, 5801);
         clientSocket.send(sendPacket);
         clientSocket.close();
         System.out.print("Sent message "+sendStr + "\n");
