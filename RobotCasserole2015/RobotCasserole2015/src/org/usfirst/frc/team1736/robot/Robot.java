@@ -1,9 +1,11 @@
 
 package org.usfirst.frc.team1736.robot;
 
+import edu.wpi.first.wpilibj.Gyro;
 import edu.wpi.first.wpilibj.IterativeRobot;
 import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.VictorSP;
+import edu.wpi.first.wpilibj.PIDSource.PIDSourceParameter;
 
 /**
  * The VM is configured to automatically run this class, and to call the
@@ -13,7 +15,6 @@ import edu.wpi.first.wpilibj.VictorSP;
  * directory.
  */
 public class Robot extends IterativeRobot {
-	//This is a test.  Just a comment to check out commits and stuff.
     /**
      * This function is run when the robot is first started up and should be
      * used for any initialization code.
@@ -53,37 +54,52 @@ public class Robot extends IterativeRobot {
 	final static double slideTune = .4;
 	
 	//PID Values
-	final static double P = 0;
+	final static double P = 0.25;
 	final static double I = 0;
 	final static double D = 0;
 	
+	//-Gyro Values
+    final static int GYRO_ID = 0;
+    final static double GYRO_SENSITIVITY = 0.007;
+    double gyroValue;
+	
+    //-Closed/Open Loop
+    final static boolean openLoop = false;
 	
 	//*Declaring robot parts*
 	//-Joystick
 	Joystick joy1;
 	
 	//-DriveTrain Motors
-	VictorSP leftRobotMotor_Front;
-	VictorSP leftRobotMotor_Back;
-	VictorSP rightRobotMotor_Front;
-	VictorSP rightRobotMotor_Back;
+	VictorSP frontLeftMotor;
+	VictorSP backLeftMotor;
+	VictorSP frontRightMotor;
+	VictorSP backRightMotor;
 	VictorSP slideMotor;
 	
 	//-DriveTrain
 	SlideTrain slideTrain;	
+	
+	//-Gyro
+	Gyro gyro;
 	
     public void robotInit() {
 
     	//Joystick
     	joy1 = new Joystick(JOY1_INT);
     	//Motors
-    	leftRobotMotor_Front = new VictorSP(LEFTROBOT_FRONTMOTOR_ID);
-    	leftRobotMotor_Back = new VictorSP(LEFTROBOT_BACKMOTOR_ID);
-    	rightRobotMotor_Front = new VictorSP(RIGHTROBOT_FRONTMOTOR_ID);
-    	rightRobotMotor_Back = new VictorSP(RIGHTROBOT_BACKMOTOR_ID);
+    	frontLeftMotor = new VictorSP(LEFTROBOT_FRONTMOTOR_ID);
+    	backLeftMotor = new VictorSP(LEFTROBOT_BACKMOTOR_ID);
+    	frontRightMotor = new VictorSP(RIGHTROBOT_FRONTMOTOR_ID);
+    	backRightMotor = new VictorSP(RIGHTROBOT_BACKMOTOR_ID);
     	slideMotor = new VictorSP(SLIDE_MOTOR_ID);
     	//Drive Train
-    	slideTrain = new SlideTrain(leftRobotMotor_Front, leftRobotMotor_Back, rightRobotMotor_Front, rightRobotMotor_Back, slideMotor, P, I, D);
+    	slideTrain = new SlideTrain(frontLeftMotor, backLeftMotor, frontRightMotor, backRightMotor, slideMotor, P, I, D);
+    	slideTrain.enable();
+    	gyro = new Gyro(GYRO_ID);
+		gyro.initGyro();
+		gyro.setPIDSourceParameter(PIDSourceParameter.kAngle);
+		gyro.setSensitivity(GYRO_SENSITIVITY);
     }
 
     /**
@@ -97,7 +113,33 @@ public class Robot extends IterativeRobot {
      * This function is called periodically during operator control
      */
     public void teleopPeriodic() {
-        slideTrain.arcadeDrive((-1 *joy1.getRawAxis(XBOX_LSTICK_YAXIS)), joy1.getRawAxis(XBOX_RSTICK_XAXIS), joy1.getRawAxis(XBOX_LSTICK_XAXIS), slideTune, true);   
+    	
+    	//acquire gyroscope value, convert to radians, wrap to proper range
+    	gyroValue = (gyro.getAngle()*(Math.PI/180)) % (2*Math.PI);
+    	if(gyro.getAngle() < 0)
+    		gyroValue += 2*Math.PI;
+    	
+    	//Run either open- or closed-loop control, depending on what is requested
+    	if(!openLoop)
+    		slideTrain.PIDarcadeDrive(joy1.getDirectionRadians(), joy1.getMagnitude(), joy1.getRawAxis(XBOX_RSTICK_XAXIS), true, gyroValue);
+    	else
+    		slideTrain.arcadeDrive((-1 *joy1.getRawAxis(XBOX_LSTICK_YAXIS)), joy1.getRawAxis(XBOX_RSTICK_XAXIS), joy1.getRawAxis(XBOX_LSTICK_XAXIS), slideTune, true);
+        
+    	//Set motor values. Note right motor values are inverted due to the physical
+    	//configuration of the robot drivetrain
+		frontRightMotor.set(-slideTrain.frontRightMotorValue);
+		frontLeftMotor.set(slideTrain.frontLeftMotorValue);
+		backRightMotor.set(-slideTrain.backRightMotorValue);
+		backLeftMotor.set(slideTrain.backLeftMotorValue);
+		slideMotor.set(slideTrain.slideMotorValue);
+		
+		//Spit some debug info out to the Riolog
+		System.out.print("Front Right Motor: " + String.format( "%.2f", slideTrain.frontRightMotorValue) + " ");
+		System.out.print("Front Left Motor: " + String.format( "%.2f", slideTrain.frontLeftMotorValue) + " ");
+		System.out.print("Back Right Motor: " + String.format( "%.2f", slideTrain.backRightMotorValue) + " ");
+		System.out.print("Back Left Motor: " + String.format( "%.2f", slideTrain.backLeftMotorValue) + " ");
+		System.out.print("Slide Motor: " + String.format( "%.2f", slideTrain.slideMotorValue) + " ");
+		System.out.println("Gyro: " + String.format( "%.2f", gyroValue) + " PID Value:" + String.format( "%.2f", slideTrain.PIDOutput));
     }
     
     /**

@@ -1,53 +1,57 @@
 package org.usfirst.frc.team1736.robot;
 
-import edu.wpi.first.wpilibj.Gyro;
-import edu.wpi.first.wpilibj.Joystick;
-import edu.wpi.first.wpilibj.PIDSource.PIDSourceParameter;
 import edu.wpi.first.wpilibj.SpeedController;
 import edu.wpi.first.wpilibj.command.PIDSubsystem;
 
 public class SlideTrain extends PIDSubsystem{
 	
-	protected SpeedController m_frontLeftMotor;
-    protected SpeedController m_frontRightMotor;
-    protected SpeedController m_backLeftMotor;
-    protected SpeedController m_backRightMotor;
-    protected SpeedController m_slideMotor;
+	protected SpeedController frontLeftMotor;
+    protected SpeedController frontRightMotor;
+    protected SpeedController backLeftMotor;
+    protected SpeedController backRightMotor;
+    protected SpeedController slideMotor;
     
-    final static int GYRO_ID = 0;
-    final static double GYRO_SENSITIVITY = 0.007;
-    double setPoint = 0;
-    double PIDOutput;
-    //M1
+	double frontLeftMotorValue;
+	double frontRightMotorValue;
+	double backLeftMotorValue;
+	double backRightMotorValue;
+	double slideMotorValue;
+    
+    double setPoint = 0; //Closed loop desired angle (set by driver) In Degrees
+    volatile double PIDOutput = 0; //corrective effort commanded by PID algorithm
+    
+    //PID correction factor
     double K1 = 1;
     double K2 = 1;
-    //M2
-    double K3 = 1;
-    double K4 = 1;
+    //Traversal correction factor
+    double K3 = 0.4;
+    double K4 = 0.4;
     
-    double setPointMultiplier = 1;
+    double setPointMultiplier = 1.5; //Multiplicative factor to tune max rate of rotation in closed loop
     
-    Gyro gyro;
+    volatile double gyroValue; //current output from the gyroscope in Radians
 	
 	public SlideTrain(SpeedController leftFrontMotor, SpeedController leftBackMotor, SpeedController rightFrontMotor, 
 					  SpeedController rightBackMotor, SpeedController slideMotor, double P, double I, double D)
 	{
 		super("SlideTrain",P,I,D);
-		m_frontLeftMotor = leftFrontMotor;
-		m_frontRightMotor = rightFrontMotor;
-		m_backLeftMotor = leftBackMotor;
-		m_backRightMotor = rightBackMotor;
-		m_slideMotor = slideMotor;
-		gyro = new Gyro(GYRO_ID);
-		gyro.initGyro();
-		gyro.setPIDSourceParameter(PIDSourceParameter.kAngle);
-		gyro.setSensitivity(GYRO_SENSITIVITY);
-		getPIDController().setContinuous(true);
+		this.frontLeftMotor = leftFrontMotor;
+		this.frontRightMotor = rightFrontMotor;
+		this.backLeftMotor = leftBackMotor;
+		this.backRightMotor = rightBackMotor;
+		this.slideMotor = slideMotor;
+		//PID Subsystem stuff
+		getPIDController().setContinuous(true); //Allow the PID algortihm to correct for error by traversing through the 360<->0 degrees.
+		                                        //this is allowable because rotation is continuous (as supposed to a slide motion)
+		getPIDController().setOutputRange(-1, 1); //we allow the output range to match that of the motor values
+		getPIDController().setInputRange(0, Math.PI*2); //Input is a full circle in radians
 	}
 	
+	//Open loop drive
 	public void arcadeDrive(double y, double z, double x, double slideCorrection, boolean squaredInputs)
 	{
-		
+		//If the user wants to square the joystick axes inputs, do so, but preserve the sign of the input.
+		//note this algorithm only works because joystick comes in in the range -1 to 1
 		if(squaredInputs)
 		{
 			if (y >= 0.0) {
@@ -72,19 +76,30 @@ public class SlideTrain extends PIDSubsystem{
             }
 		}
 		
-		m_frontRightMotor.set((limit((y + (slideCorrection * x)) - z)) * -1);
-		m_frontLeftMotor.set(limit((y - (slideCorrection * x)) + z));
-		m_backRightMotor.set((limit((y + (slideCorrection * x)) - z)) * -1);
-		m_backLeftMotor.set(limit((y - (slideCorrection * x)) + z));
-		m_slideMotor.set(limit(x));
+		//calculate output motor values
+		//limit between -1 and 1
+		//see github wiki for explanation of equations
+		frontRightMotorValue = ((limit((y + (slideCorrection * x)) - z)));
+		frontLeftMotorValue = (limit((y - (slideCorrection * x)) + z));
+		backRightMotorValue = ((limit((y + (slideCorrection * x)) - z)));
+		backLeftMotorValue = (limit((y - (slideCorrection * x)) + z));
+		slideMotorValue = (limit(x));
 	}
 	
-	public void PIDarcadeDrive(Joystick joy, double L_XAxis, double L_YAxis, double R_XAxis, boolean squaredInputs)
+	//Closed loop control
+	public void PIDarcadeDrive(double lDirectionRad, double lMagnitude, double R_XAxis, boolean squaredInputs, double gyroValue)
 	{
-		//PID Subsystem stuff
-		setOutputRange(-1, 1);
+		//square the magnititude input if requested (for better low-speed control)
+		if(squaredInputs)
+			lMagnitude *= lMagnitude;
+		
+		//make a local copy of the current gyroscope value (radians)
+		this.gyroValue = gyroValue;
 		
 		
+		//calculate the pose angle setpoint 
+		//increase/decrease the setpoint based on the current value of the 
+		//right joystick x axis. Wrap the value between 0 and 360 degrees.
 		if(R_XAxis > 0.5 && setPoint > 0)
 		{
 			setPoint = (setPoint + (R_XAxis * setPointMultiplier)) % 360;
@@ -106,27 +121,35 @@ public class SlideTrain extends PIDSubsystem{
 			setPoint = (360 + (R_XAxis * setPointMultiplier)) % 360;
 		}
 		
-		setSetpoint(setPoint);
 		
+		//Convert the setpoint to radians and send that value to the PID controller
+		setSetpoint(Math.toRadians(setPoint));
+		
+		//Print setpoint to Riolog for debugging
 		System.out.print(setPoint + "\n");
 		
-		double m1_traversal = (joy.getMagnitude() * Math.sin((Math.PI/2) - joy.getDirectionRadians()));
-		double m1_rotational = (((-1) * PIDOutput) * (gyro.pidGet() - setPoint)) * K1;
-		double m1_traversal_correction = (-1 * Math.sin(joy.getDirectionRadians())) * joy.getMagnitude() * K2;
 		
-		double m2_traversal = (joy.getMagnitude() * Math.sin((Math.PI/2) - joy.getDirectionRadians()));
-		double m2_rotational = (PIDOutput * (gyro.pidGet() - setPoint)) * K3;
-		double m2_traversal_correction = (Math.sin(joy.getDirectionRadians())) * joy.getMagnitude() * K4;
+		//Perform motor Calculations. See github wiki for explanation of equations
+		//Note that PIDOutput is given a value asynchronously by the PID controller
+		double m1_traversal = (lMagnitude * Math.sin((Math.PI/2) - lDirectionRad));
+		double m1_rotational = ((-1) * PIDOutput) * K1;
+		double m1_traversal_correction = (-1 * Math.sin(lDirectionRad)) * lMagnitude * K3;
 		
-		double m3_traversal = joy.getMagnitude() * Math.cos((Math.PI/2) - joy.getDirectionRadians());
+		double m2_traversal = (lMagnitude * Math.sin((Math.PI/2) - lDirectionRad));
+		double m2_rotational = PIDOutput * K2;
+		double m2_traversal_correction = (Math.sin(lDirectionRad)) * lMagnitude * K4;
 		
-		m_frontRightMotor.set(m1_traversal + m1_rotational + m1_traversal_correction);
-		m_frontLeftMotor.set(m1_traversal + m1_rotational + m1_traversal_correction);
-		m_backRightMotor.set(m2_traversal + m2_rotational + m2_traversal_correction);
-		m_backLeftMotor.set(m2_traversal + m2_rotational + m2_traversal_correction);
-		m_slideMotor.set(m3_traversal);
+		double m3_traversal = lMagnitude * Math.cos((Math.PI/2) - lDirectionRad);
+		
+		//Add all contributers to each motor's value and limit the result to the proper range
+		frontLeftMotorValue = limit((m1_traversal + m1_rotational + m1_traversal_correction));
+		backLeftMotorValue = limit((m1_traversal + m1_rotational + m1_traversal_correction));
+		frontRightMotorValue = limit((m2_traversal + m2_rotational + m2_traversal_correction));
+		backRightMotorValue = limit((m2_traversal + m2_rotational + m2_traversal_correction));
+		slideMotorValue = limit((m3_traversal));
 	}
 	
+	//limit an input to the valid range for motor outputs (-1 to 1)
     protected static double limit(double num) {
         if (num > 1.0) {
             return 1.0;
@@ -137,18 +160,23 @@ public class SlideTrain extends PIDSubsystem{
         return num;
     }
 
+    //PID controller override. This function is called by the PID controller thread asynchronously from the 
+    //rest of the robot code. It should always return the current input value to the PID (for us, this is from the gyroscope)
 	@Override
 	protected double returnPIDInput() {
-		// TODO Auto-generated method stub
-		return gyro.pidGet();
+		return gyroValue; //in radians
 	}
 
+	//PID output usage function. 
+	//This function will be called asynchronously by the PID controller thread. Every time it is called, we need to do 
+	//something with the argument "output", which represents the most recent output calculation from the PID loop.
+	//For our purposes, we just write it to a variable in SlideTrain for later usage in closed loop calculations.
 	@Override
 	protected void usePIDOutput(double output) {
-		// TODO Auto-generated method stub
-		PIDOutput = output;
+		PIDOutput = -1 * output;
 	}
 
+	//I have literally no idea what this function is for. Apparently you HAVE to override it. Ah well.
 	@Override
 	protected void initDefaultCommand() {
 		// TODO Auto-generated method stub
