@@ -2,9 +2,11 @@
 package org.usfirst.frc.team1736.robot;
 
 import edu.wpi.first.wpilibj.CANJaguar;
+import edu.wpi.first.wpilibj.Compressor;
 import edu.wpi.first.wpilibj.DigitalInput;
 import edu.wpi.first.wpilibj.IterativeRobot;
 import edu.wpi.first.wpilibj.Joystick;
+import edu.wpi.first.wpilibj.Solenoid;
 import edu.wpi.first.wpilibj.SpeedController;
 import edu.wpi.first.wpilibj.VictorSP;
 
@@ -19,26 +21,25 @@ public class Robot extends IterativeRobot {
 
 	/*private variables*/
 	private Joystick stick;
+	private Joystick stick2;
 	private VictorSP Motor1;
 	private VictorSP Motor2;
 	private VictorSP Motor3;
 	
-	private CANJaguar armMotor;
-	private DigitalInput armExtended;
-	private DigitalInput armClosed;
-	private boolean isExtended = false;
+	//pneumatics for arm extension 
+	private Compressor compressor;
+	private Solenoid solenoidInOut;
+	private Solenoid solenoidOpenClose;
+
 	
 	
 	
 	/*Robot config section*/
 	private static final int DRIVER_JOYSTICK_INDEX = 0;
+	private static final int OPERATOR_JOYSTICK_INDEX = 1;
 	private static final int MOTOR_1_PORT = 0;
 	private static final int MOTOR_2_PORT = 1;
 	private static final int MOTOR_3_PORT = 2;
-	
-	private static final int ArmMotor_Port = 3;
-	private static final int ArmExtended_Port = 4;
-	private static final int ArmClosed_Port = 5;
 	
 	private static final double OPEN_LOOP_CROT_GAIN = 0.3;
 	
@@ -74,11 +75,12 @@ public class Robot extends IterativeRobot {
     	Motor1 = new VictorSP(MOTOR_1_PORT);
     	Motor2 = new VictorSP(MOTOR_2_PORT);
     	Motor3 = new VictorSP(MOTOR_3_PORT);
-    	
-    	armMotor = new CANJaguar(ArmMotor_Port);
-    	armExtended = new DigitalInput(ArmExtended_Port);
-    	armClosed = new DigitalInput(ArmClosed_Port);
-    }
+    	compressor = new Compressor();
+    	compressor.start();
+    	stick2 = new Joystick(OPERATOR_JOYSTICK_INDEX);
+    	solenoidInOut = new Solenoid(0);
+    	solenoidOpenClose = new Solenoid(1);
+    	}
 
     /**
      * This function is called periodically during autonomous
@@ -94,33 +96,17 @@ public class Robot extends IterativeRobot {
         
     	openLoopRobotOriented(); //Call driver-to-robot mapping fcn.
     	
-    	//might need to change true/false based on limit switch
-    	if(stick.getRawButton(1))
-    	{
-    		isExtended = true;
+    	if(stick2.getRawButton(1)){
+    		solenoidInOut.set(true);
+    	}else if(stick2.getRawButton(2)){
+    		solenoidInOut.set(false);
     	}
-    	else if(stick.getRawButton(2))
-    	{
-    		isExtended = false;
+    	if(stick2.getRawButton(3)){
+    		solenoidOpenClose.set(true);
+    	}else if(stick2.getRawButton(4)){
+    		solenoidOpenClose.set(false);
     	}
-    	
-    	if(isExtended && !armExtended.get())
-    	{
-    		armMotor.set(1); //assumes 1 pushes out
-    	}
-    	else if(isExtended && armExtended.get())
-    	{
-    			armMotor.set(0);
-    	}
-    	else if(!isExtended && !armClosed.get())
-    	{
-    		armMotor.set(-1); //assumes -1 pulls in
-    	}
-    	else if(!isExtended && armClosed.get())
-    	{
-    			armMotor.set(0);
-    		}
-    	}
+    }
     	
     
     /**
