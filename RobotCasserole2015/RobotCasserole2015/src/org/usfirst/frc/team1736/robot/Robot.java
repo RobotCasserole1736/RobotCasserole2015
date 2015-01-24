@@ -54,9 +54,9 @@ public class Robot extends IterativeRobot {
 	final static double slideTune = .4;
 	
 	//PID Values
-	final static double P = 0.25;
-	final static double I = 0;
-	final static double D = 0;
+	final static double P = 1.0;
+	final static double I = 0.01;
+	final static double D = 1.2;
 	
 	//-Gyro Values
     final static int GYRO_ID = 0;

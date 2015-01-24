@@ -27,7 +27,7 @@ public class SlideTrain extends PIDSubsystem{
     double K3 = 0.4;
     double K4 = 0.4;
     
-    double setPointMultiplier = 1.5; //Multiplicative factor to tune max rate of rotation in closed loop
+    double setPointMultiplier = 3.2; //Multiplicative factor to tune max rate of rotation in closed loop
     
     volatile double gyroValue; //current output from the gyroscope in Radians
 	
@@ -100,21 +100,21 @@ public class SlideTrain extends PIDSubsystem{
 		//calculate the pose angle setpoint 
 		//increase/decrease the setpoint based on the current value of the 
 		//right joystick x axis. Wrap the value between 0 and 360 degrees.
-		if(R_XAxis > 0.5 && setPoint > 0)
+		if(R_XAxis > 0.2 && setPoint > 0)
 		{
-			setPoint = (setPoint + (R_XAxis * setPointMultiplier)) % 360;
+			setPoint = (setPoint + (R_XAxis*R_XAxis * setPointMultiplier)) % 360;
 		}
-		else if(R_XAxis < -0.5 && setPoint > 0)
+		else if(R_XAxis < -0.2 && setPoint > 0)
 		{
-			setPoint = (setPoint + (R_XAxis * setPointMultiplier)) % 360;
+			setPoint = (setPoint + (-R_XAxis*R_XAxis * setPointMultiplier)) % 360;
 		}
-		else if(R_XAxis < -0.5 && setPoint == 0)
+		else if(R_XAxis < -0.2 && setPoint == 0)
 		{
-			setPoint = (360 + (R_XAxis * setPointMultiplier)) % 360;
+			setPoint = (360 + (-R_XAxis * R_XAxis * setPointMultiplier)) % 360;
 		}
-		else if(R_XAxis > 0.5 && setPoint == 0)
+		else if(R_XAxis > 0.2 && setPoint == 0)
 		{
-			setPoint = (setPoint + (R_XAxis * setPointMultiplier)) % 360;
+			setPoint = (setPoint + (R_XAxis* R_XAxis * setPointMultiplier)) % 360;
 		}
 		else if(setPoint < 0)
 		{
