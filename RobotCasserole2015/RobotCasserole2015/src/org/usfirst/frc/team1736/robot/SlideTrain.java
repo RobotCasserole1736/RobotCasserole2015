@@ -26,6 +26,9 @@ public class SlideTrain extends PIDSubsystem{
     //Traversal correction factor
     double K3 = 0.4;
     double K4 = 0.4;
+    //Feed Forward constants
+    double K5 = 0;
+    double K6 = 0;
     
     double setPointMultiplier = 3.2; //Multiplicative factor to tune max rate of rotation in closed loop
     
@@ -96,6 +99,8 @@ public class SlideTrain extends PIDSubsystem{
 		//make a local copy of the current gyroscope value (radians)
 		this.gyroValue = gyroValue;
 		
+		double previous_R_XAxis_value = R_XAxis;
+		
 		
 		//calculate the pose angle setpoint 
 		//increase/decrease the setpoint based on the current value of the 
@@ -121,6 +126,11 @@ public class SlideTrain extends PIDSubsystem{
 			setPoint = (360 + (R_XAxis * setPointMultiplier)) % 360;
 		}
 		
+		if((previous_R_XAxis_value > 0.2 || previous_R_XAxis_value < -0.2) && (R_XAxis < 0.2 && R_XAxis > -0.2))
+		{
+			setPoint = gyroValue;
+		}
+		
 		
 		//Convert the setpoint to radians and send that value to the PID controller
 		setSetpoint(Math.toRadians(setPoint));
@@ -134,18 +144,20 @@ public class SlideTrain extends PIDSubsystem{
 		double m1_traversal = (lMagnitude * Math.sin((Math.PI/2) - lDirectionRad));
 		double m1_rotational = ((-1) * PIDOutput) * K1;
 		double m1_traversal_correction = (-1 * Math.sin(lDirectionRad)) * lMagnitude * K3;
+		double m1_feed_forward = (K5 * R_XAxis);
 		
 		double m2_traversal = (lMagnitude * Math.sin((Math.PI/2) - lDirectionRad));
 		double m2_rotational = PIDOutput * K2;
 		double m2_traversal_correction = (Math.sin(lDirectionRad)) * lMagnitude * K4;
+		double m2_feed_forward = (K6 * R_XAxis);
 		
 		double m3_traversal = lMagnitude * Math.cos((Math.PI/2) - lDirectionRad);
 		
 		//Add all contributers to each motor's value and limit the result to the proper range
-		frontLeftMotorValue = limit((m1_traversal + m1_rotational + m1_traversal_correction));
-		backLeftMotorValue = limit((m1_traversal + m1_rotational + m1_traversal_correction));
-		frontRightMotorValue = limit((m2_traversal + m2_rotational + m2_traversal_correction));
-		backRightMotorValue = limit((m2_traversal + m2_rotational + m2_traversal_correction));
+		frontLeftMotorValue = limit((m1_traversal + m1_rotational + m1_traversal_correction + m1_feed_forward));
+		backLeftMotorValue = limit((m1_traversal + m1_rotational + m1_traversal_correction + m1_feed_forward));
+		frontRightMotorValue = limit((m2_traversal + m2_rotational + m2_traversal_correction + m2_feed_forward));
+		backRightMotorValue = limit((m2_traversal + m2_rotational + m2_traversal_correction + m2_feed_forward));
 		slideMotorValue = limit((m3_traversal));
 	}
 	
