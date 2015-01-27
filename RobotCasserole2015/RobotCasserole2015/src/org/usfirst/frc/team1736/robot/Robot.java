@@ -30,6 +30,8 @@ public class Robot extends IterativeRobot {
 	private Compressor compressor;
 	private Solenoid solenoidInOut;
 	private Solenoid solenoidOpenClose;
+	
+	Elevator elevator;
 
 	
 	
@@ -42,6 +44,16 @@ public class Robot extends IterativeRobot {
 	private static final int MOTOR_3_PORT = 2;
 	
 	private static final double OPEN_LOOP_CROT_GAIN = 0.3;
+	
+	private static final int ELEVATOR_MOTOR_ID = 0;
+	private static final double ELEVATOR_P = 0;
+	private static final double ELEVATOR_I = 0;
+	private static final double ELEVATOR_D = 0;
+	private static final int ENCODER_A = 0;
+	private static final int ENCODER_B = 0;
+	private static final int ZERO_SENSOR_ID = 0;
+	private static final double MIN_RETRACT_HEIGHT = .05;
+	
 	
 	/*Drive Type functions*/
 	private void openLoopRobotOriented() {
@@ -70,6 +82,12 @@ public class Robot extends IterativeRobot {
      * This function is run when the robot is first started up and should be
      * used for any initialization code.
      */
+	
+	final int LEVEL1 = 625;
+	final int LEVEL2 = 1250;
+	final int LEVEL3 = 1875;
+	final int LEVEL4 = 2500;
+	
     public void robotInit() {
     	stick = new Joystick(DRIVER_JOYSTICK_INDEX);
     	Motor1 = new VictorSP(MOTOR_1_PORT);
@@ -80,6 +98,8 @@ public class Robot extends IterativeRobot {
     	stick2 = new Joystick(OPERATOR_JOYSTICK_INDEX);
     	solenoidInOut = new Solenoid(0);
     	solenoidOpenClose = new Solenoid(1);
+    	elevator = new Elevator(ELEVATOR_MOTOR_ID, ELEVATOR_P, ELEVATOR_I, ELEVATOR_D, ENCODER_A, ENCODER_B, ZERO_SENSOR_ID);
+    	
     	}
 
     /**
@@ -98,7 +118,7 @@ public class Robot extends IterativeRobot {
     	
     	if(stick2.getRawButton(1)){
     		solenoidInOut.set(true);
-    	}else if(stick2.getRawButton(2)){
+    	}else if(stick2.getRawButton(2) && elevator.returnPIDInput() > MIN_RETRACT_HEIGHT){
     		solenoidInOut.set(false);
     	}
     	if(stick2.getRawButton(3)){
