@@ -1,11 +1,15 @@
 
 package org.usfirst.frc.team1736.robot;
 
+import edu.wpi.first.wpilibj.AnalogInput;
+import edu.wpi.first.wpilibj.Compressor;
 import edu.wpi.first.wpilibj.Gyro;
 import edu.wpi.first.wpilibj.IterativeRobot;
 import edu.wpi.first.wpilibj.Joystick;
+import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.VictorSP;
 import edu.wpi.first.wpilibj.PIDSource.PIDSourceParameter;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
 /**
  * The VM is configured to automatically run this class, and to call the
@@ -54,14 +58,22 @@ public class Robot extends IterativeRobot {
 	final static double slideTune = .4;
 	
 	//PID Values
-	final static double P = 1.0;
-	final static double I = 0.01;
-	final static double D = 1.2;
-	
+	final static double P = .60;
+	final static double I = .075;
+	final static double D = 2;
+//	
+//	//PID Values
+//	final static double P = 0;
+//	final static double I = 0;
+//	final static double D = 0;
+//	
 	//-Gyro Values
     final static int GYRO_ID = 0;
     final static double GYRO_SENSITIVITY = 0.007;
     double gyroValue;
+    
+    //-Compressor IDs
+    final static int PRESSURE_SENSOR_ID = 2;
 	
     //-Closed/Open Loop
     final static boolean openLoop = false;
@@ -83,6 +95,11 @@ public class Robot extends IterativeRobot {
 	//-Gyro
 	Gyro gyro;
 	
+	//-Compressor
+	Compressor compressor;
+	
+	AnalogInput pressureSensor;
+	
     public void robotInit() {
 
     	//Joystick
@@ -100,8 +117,16 @@ public class Robot extends IterativeRobot {
 		gyro.initGyro();
 		gyro.setPIDSourceParameter(PIDSourceParameter.kAngle);
 		gyro.setSensitivity(GYRO_SENSITIVITY);
+		compressor = new Compressor();
+		pressureSensor = new AnalogInput(PRESSURE_SENSOR_ID);
     }
 
+    public void autonomousInit() {
+    	
+    	slideTrain.lastTime = Timer.getFPGATimestamp();
+    	
+    }
+    
     /**
      * This function is called periodically during autonomous
      */
@@ -109,6 +134,12 @@ public class Robot extends IterativeRobot {
 
     }
 
+    public void teleopInit() {
+    	
+    	slideTrain.lastTime = Timer.getFPGATimestamp();
+    	
+    }
+    
     /**
      * This function is called periodically during operator control
      */
@@ -140,6 +171,7 @@ public class Robot extends IterativeRobot {
 		System.out.print("Back Left Motor: " + String.format( "%.2f", slideTrain.backLeftMotorValue) + " ");
 		System.out.print("Slide Motor: " + String.format( "%.2f", slideTrain.slideMotorValue) + " ");
 		System.out.println("Gyro: " + String.format( "%.2f", gyroValue) + " PID Value:" + String.format( "%.2f", slideTrain.PIDOutput));
+		SmartDashboard.putNumber("Pressure Voltage", pressureSensor.getAverageVoltage());
     }
     
     /**

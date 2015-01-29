@@ -1,7 +1,9 @@
 package org.usfirst.frc.team1736.robot;
 
 import edu.wpi.first.wpilibj.SpeedController;
+import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.command.PIDSubsystem;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
 public class SlideTrain extends PIDSubsystem{
 	
@@ -27,10 +29,12 @@ public class SlideTrain extends PIDSubsystem{
     double K3 = 0.4;
     double K4 = 0.4;
     //Feed Forward constants
-    double K5 = 0;
-    double K6 = 0;
+    double K5 = 0.5;
+    double K6 = 0.5;
     
-    double setPointMultiplier = 3.2; //Multiplicative factor to tune max rate of rotation in closed loop
+    double setPointMultiplier = 288 * .02; //Multiplicative factor to tune max rate of rotation in closed loop
+    
+    static double lastTime = 0;
     
     volatile double gyroValue; //current output from the gyroscope in Radians
 	
@@ -101,35 +105,43 @@ public class SlideTrain extends PIDSubsystem{
 		
 		double previous_R_XAxis_value = R_XAxis;
 		
+		setPointMultiplier = 288 * (Timer.getFPGATimestamp() - lastTime);
+		
+		lastTime = Timer.getFPGATimestamp();
+	
+		double twistValue = R_XAxis/ Math.abs(R_XAxis) * R_XAxis*R_XAxis;
 		
 		//calculate the pose angle setpoint 
 		//increase/decrease the setpoint based on the current value of the 
 		//right joystick x axis. Wrap the value between 0 and 360 degrees.
-		if(R_XAxis > 0.2 && setPoint > 0)
+		if(twistValue > 0.15 && setPoint > 0)
 		{
-			setPoint = (setPoint + (R_XAxis*R_XAxis * setPointMultiplier)) % 360;
+			setPoint = (setPoint + (twistValue * setPointMultiplier)) % 360;
 		}
-		else if(R_XAxis < -0.2 && setPoint > 0)
+		else if(twistValue < -0.15 && setPoint > 0)
 		{
-			setPoint = (setPoint + (-R_XAxis*R_XAxis * setPointMultiplier)) % 360;
+			setPoint = (setPoint + (twistValue * setPointMultiplier)) % 360;
 		}
-		else if(R_XAxis < -0.2 && setPoint == 0)
+		else if(twistValue < -0.15 && setPoint == 0)
 		{
-			setPoint = (360 + (-R_XAxis * R_XAxis * setPointMultiplier)) % 360;
+			setPoint = (360 + (twistValue * setPointMultiplier)) % 360;
 		}
-		else if(R_XAxis > 0.2 && setPoint == 0)
+		else if(twistValue > 0.15 && setPoint == 0)
 		{
-			setPoint = (setPoint + (R_XAxis* R_XAxis * setPointMultiplier)) % 360;
+			setPoint = (setPoint + (twistValue * setPointMultiplier)) % 360;
 		}
 		else if(setPoint < 0)
 		{
-			setPoint = (360 + (R_XAxis * setPointMultiplier)) % 360;
+			setPoint = (360 + (twistValue * setPointMultiplier)) % 360;
 		}
+		SmartDashboard.putNumber("Setpoint", setPoint);
+		SmartDashboard.putNumber("PIDOutput", PIDOutput);
+		SmartDashboard.putNumber("Gyro", gyroValue);
 		
-		if((previous_R_XAxis_value > 0.2 || previous_R_XAxis_value < -0.2) && (R_XAxis < 0.2 && R_XAxis > -0.2))
-		{
-			setPoint = gyroValue;
-		}
+//		if((previous_R_XAxis_value > 0.3 || previous_R_XAxis_value < -0.3) && (R_XAxis < 0.3 && R_XAxis > -0.3))
+//		{
+//			setPoint = gyroValue;
+//		}
 		
 		
 		//Convert the setpoint to radians and send that value to the PID controller
@@ -156,8 +168,8 @@ public class SlideTrain extends PIDSubsystem{
 		//Add all contributers to each motor's value and limit the result to the proper range
 		frontLeftMotorValue = limit((m1_traversal + m1_rotational + m1_traversal_correction + m1_feed_forward));
 		backLeftMotorValue = limit((m1_traversal + m1_rotational + m1_traversal_correction + m1_feed_forward));
-		frontRightMotorValue = limit((m2_traversal + m2_rotational + m2_traversal_correction + m2_feed_forward));
-		backRightMotorValue = limit((m2_traversal + m2_rotational + m2_traversal_correction + m2_feed_forward));
+		frontRightMotorValue = limit((m2_traversal + m2_rotational + m2_traversal_correction - m2_feed_forward));
+		backRightMotorValue = limit((m2_traversal + m2_rotational + m2_traversal_correction - m2_feed_forward));
 		slideMotorValue = limit((m3_traversal));
 	}
 	
