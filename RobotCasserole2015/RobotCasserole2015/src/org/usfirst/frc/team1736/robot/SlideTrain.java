@@ -34,6 +34,10 @@ public class SlideTrain extends PIDSubsystem{
     
     double setPointMultiplier = 288 * .02; //Multiplicative factor to tune max rate of rotation in closed loop
     
+    Boolean needsToLoop;
+    int numberOfLoops = 0;
+    final int PIDWaitLoop = 20;
+    
     static double lastTime = 0;
     
     volatile double gyroValue; //current output from the gyroscope in Radians
@@ -48,7 +52,7 @@ public class SlideTrain extends PIDSubsystem{
 		this.backRightMotor = rightBackMotor;
 		this.slideMotor = slideMotor;
 		//PID Subsystem stuff
-		getPIDController().setContinuous(true); //Allow the PID algortihm to correct for error by traversing through the 360<->0 degrees.
+		getPIDController().setContinuous(true); //Allow the PID algorithm to correct for error by traversing through the 360<->0 degrees.
 		                                        //this is allowable because rotation is continuous (as supposed to a slide motion)
 		getPIDController().setOutputRange(-1, 1); //we allow the output range to match that of the motor values
 		getPIDController().setInputRange(0, Math.PI*2); //Input is a full circle in radians
@@ -103,7 +107,7 @@ public class SlideTrain extends PIDSubsystem{
 		//make a local copy of the current gyroscope value (radians)
 		this.gyroValue = gyroValue;
 		
-		double previous_R_XAxis_value = R_XAxis;
+		double previous_R_XAxis_value = R_XAxis*R_XAxis;
 		
 		setPointMultiplier = 288 * (Timer.getFPGATimestamp() - lastTime);
 		
@@ -138,11 +142,29 @@ public class SlideTrain extends PIDSubsystem{
 		SmartDashboard.putNumber("PIDOutput", PIDOutput);
 		SmartDashboard.putNumber("Gyro", gyroValue);
 		
-//		if((previous_R_XAxis_value > 0.3 || previous_R_XAxis_value < -0.3) && (R_XAxis < 0.3 && R_XAxis > -0.3))
-//		{
-//			setPoint = gyroValue;
-//		}
+		//From deadzone to out of deadzone
+		if((previous_R_XAxis_value < 0.15 && previous_R_XAxis_value > -0.15) && (twistValue > 0.15 || twistValue < -0.15))
+		{
+			disable();
+			needsToLoop = false;
+			numberOfLoops = 0;
+		}
+		//From out of deadzone to deadzone
+		else if((previous_R_XAxis_value > 0.15 || previous_R_XAxis_value < -0.15) && (twistValue < 0.15 && twistValue > -0.15))
+		{
+			needsToLoop = true;
+		}		
 		
+		if(needsToLoop)
+		{
+			numberOfLoops++;
+			if(numberOfLoops >= PIDWaitLoop)
+			{
+				numberOfLoops = 0;
+				needsToLoop = false;
+				enable();
+			}
+		}
 		
 		//Convert the setpoint to radians and send that value to the PID controller
 		setSetpoint(Math.toRadians(setPoint));
