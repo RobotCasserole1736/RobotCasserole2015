@@ -11,12 +11,14 @@ import edu.wpi.first.wpilibj.IterativeRobot;
  * directory.
  */
 public class Robot extends IterativeRobot {
-	//This is a test.  Just a comment to check out commits and stuff.
+	
+	I2CGyro testgyro;
     /**
      * This function is run when the robot is first started up and should be
      * used for any initialization code.
      */
     public void robotInit() {
+
 
     }
 
@@ -34,10 +36,16 @@ public class Robot extends IterativeRobot {
         
     }
     
+    @Override
+    public void testInit(){
+    	testgyro = new I2CGyro();
+    }
     /**
      * This function is called periodically during test mode
      */
     public void testPeriodic() {
+    	testgyro.periodic_update();
+    	System.out.println("Gyro Val = " + testgyro.get_gyro_z() + " Gyro Angle = " + testgyro.get_gyro_angle());
     
     }
     
