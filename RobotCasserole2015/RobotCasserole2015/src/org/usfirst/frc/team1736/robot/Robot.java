@@ -78,6 +78,9 @@ public class Robot extends IterativeRobot {
     //-Closed/Open Loop
     final static boolean openLoop = false;
 	
+    //-Autonomous mode
+    int autonomousMode = 0;
+    
 	//*Declaring robot parts*
 	//-Joystick
 	Joystick joy1;
@@ -119,10 +122,13 @@ public class Robot extends IterativeRobot {
 		gyro.setSensitivity(GYRO_SENSITIVITY);
 		compressor = new Compressor();
 		pressureSensor = new AnalogInput(PRESSURE_SENSOR_ID);
+		
+		SmartDashboard.putNumber("Autonomous Mode:", autonomousMode);
     }
 
     public void autonomousInit() {
     	
+    	SmartDashboard.getNumber("Autonomous Mode:");
     	slideTrain.lastTime = Timer.getFPGATimestamp();
     	
     }
@@ -132,6 +138,20 @@ public class Robot extends IterativeRobot {
      */
     public void autonomousPeriodic() {
 
+    	switch(autonomousMode)
+    	{
+    	case 1:
+    		
+    		break;
+    	case 2:
+    		
+    		break;
+    		
+    	case 3:
+    		
+    		break;
+    	}
+    	
     }
 
     public void teleopInit() {
@@ -155,6 +175,8 @@ public class Robot extends IterativeRobot {
     		slideTrain.PIDarcadeDrive(joy1.getDirectionRadians(), joy1.getMagnitude(), joy1.getRawAxis(XBOX_RSTICK_XAXIS), true, gyroValue);
     	else
     		slideTrain.arcadeDrive((-1 *joy1.getRawAxis(XBOX_LSTICK_YAXIS)), joy1.getRawAxis(XBOX_RSTICK_XAXIS), joy1.getRawAxis(XBOX_LSTICK_XAXIS), slideTune, true);
+    	if(!slideTrain.getPIDController().isEnable())
+    		gyro.reset();
         
     	//Set motor values. Note right motor values are inverted due to the physical
     	//configuration of the robot drivetrain
@@ -165,12 +187,12 @@ public class Robot extends IterativeRobot {
 		slideMotor.set(slideTrain.slideMotorValue);
 		
 		//Spit some debug info out to the Riolog
-		System.out.print("Front Right Motor: " + String.format( "%.2f", slideTrain.frontRightMotorValue) + " ");
-		System.out.print("Front Left Motor: " + String.format( "%.2f", slideTrain.frontLeftMotorValue) + " ");
-		System.out.print("Back Right Motor: " + String.format( "%.2f", slideTrain.backRightMotorValue) + " ");
-		System.out.print("Back Left Motor: " + String.format( "%.2f", slideTrain.backLeftMotorValue) + " ");
-		System.out.print("Slide Motor: " + String.format( "%.2f", slideTrain.slideMotorValue) + " ");
-		System.out.println("Gyro: " + String.format( "%.2f", gyroValue) + " PID Value:" + String.format( "%.2f", slideTrain.PIDOutput));
+//		System.out.print("Front Right Motor: " + String.format( "%.2f", slideTrain.frontRightMotorValue) + " ");
+//		System.out.print("Front Left Motor: " + String.format( "%.2f", slideTrain.frontLeftMotorValue) + " ");
+//		System.out.print("Back Right Motor: " + String.format( "%.2f", slideTrain.backRightMotorValue) + " ");
+//		System.out.print("Back Left Motor: " + String.format( "%.2f", slideTrain.backLeftMotorValue) + " ");
+//		System.out.print("Slide Motor: " + String.format( "%.2f", slideTrain.slideMotorValue) + " ");
+//		System.out.println("Gyro: " + String.format( "%.2f", gyroValue) + " PID Value:" + String.format( "%.2f", slideTrain.PIDOutput));
 		SmartDashboard.putNumber("Pressure Voltage", pressureSensor.getAverageVoltage());
     }
     

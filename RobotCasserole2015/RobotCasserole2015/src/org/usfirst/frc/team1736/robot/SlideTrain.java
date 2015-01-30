@@ -32,9 +32,11 @@ public class SlideTrain extends PIDSubsystem{
     double K5 = 0.5;
     double K6 = 0.5;
     
+    double previous_R_XAxis_value = 0;
+    
     double setPointMultiplier = 288 * .02; //Multiplicative factor to tune max rate of rotation in closed loop
     
-    Boolean needsToLoop;
+    Boolean needsToLoop = false;
     int numberOfLoops = 0;
     final int PIDWaitLoop = 20;
     
@@ -107,8 +109,6 @@ public class SlideTrain extends PIDSubsystem{
 		//make a local copy of the current gyroscope value (radians)
 		this.gyroValue = gyroValue;
 		
-		double previous_R_XAxis_value = R_XAxis*R_XAxis;
-		
 		setPointMultiplier = 288 * (Timer.getFPGATimestamp() - lastTime);
 		
 		lastTime = Timer.getFPGATimestamp();
@@ -145,24 +145,30 @@ public class SlideTrain extends PIDSubsystem{
 		//From deadzone to out of deadzone
 		if((previous_R_XAxis_value < 0.15 && previous_R_XAxis_value > -0.15) && (twistValue > 0.15 || twistValue < -0.15))
 		{
-			disable();
+			System.out.println("From deadzone to out of deadzone");
+			getPIDController().reset();
 			needsToLoop = false;
 			numberOfLoops = 0;
 		}
 		//From out of deadzone to deadzone
 		else if((previous_R_XAxis_value > 0.15 || previous_R_XAxis_value < -0.15) && (twistValue < 0.15 && twistValue > -0.15))
 		{
+			System.out.println("From out of deadzone to deadzone");
 			needsToLoop = true;
 		}		
 		
 		if(needsToLoop)
 		{
+			System.out.println("Needs to loop");
 			numberOfLoops++;
 			if(numberOfLoops >= PIDWaitLoop)
 			{
 				numberOfLoops = 0;
 				needsToLoop = false;
-				enable();
+				setPoint = gyroValue;
+				setSetpoint(Math.toRadians(setPoint));
+				getPIDController().reset();
+				getPIDController().enable();
 			}
 		}
 		
@@ -170,7 +176,7 @@ public class SlideTrain extends PIDSubsystem{
 		setSetpoint(Math.toRadians(setPoint));
 		
 		//Print setpoint to Riolog for debugging
-		System.out.print(setPoint + "\n");
+		//System.out.print(setPoint + "\n");
 		
 		
 		//Perform motor Calculations. See github wiki for explanation of equations
@@ -193,6 +199,8 @@ public class SlideTrain extends PIDSubsystem{
 		frontRightMotorValue = limit((m2_traversal + m2_rotational + m2_traversal_correction - m2_feed_forward));
 		backRightMotorValue = limit((m2_traversal + m2_rotational + m2_traversal_correction - m2_feed_forward));
 		slideMotorValue = limit((m3_traversal));
+		
+		previous_R_XAxis_value = twistValue;
 	}
 	
 	//limit an input to the valid range for motor outputs (-1 to 1)
