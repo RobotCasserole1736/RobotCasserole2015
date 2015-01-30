@@ -51,7 +51,8 @@ public class Robot extends IterativeRobot {
 	private static final double ELEVATOR_D = 0;
 	private static final int ENCODER_A = 0;
 	private static final int ENCODER_B = 0;
-	private static final int ZERO_SENSOR_ID = 0;
+	private static final int BOTTOM_SENSOR_ID = 0;
+	private static final int TOP_SENSOR_ID = 0;
 	private static final double MIN_RETRACT_HEIGHT = .05;
 	
 	
@@ -98,7 +99,7 @@ public class Robot extends IterativeRobot {
     	stick2 = new Joystick(OPERATOR_JOYSTICK_INDEX);
     	solenoidInOut = new Solenoid(0);
     	solenoidOpenClose = new Solenoid(1);
-    	elevator = new Elevator(ELEVATOR_MOTOR_ID, ELEVATOR_P, ELEVATOR_I, ELEVATOR_D, ENCODER_A, ENCODER_B, ZERO_SENSOR_ID);
+    	elevator = new Elevator(ELEVATOR_MOTOR_ID, ELEVATOR_P, ELEVATOR_I, ELEVATOR_D, ENCODER_A, ENCODER_B, BOTTOM_SENSOR_ID, TOP_SENSOR_ID);
     	
     	}
 
