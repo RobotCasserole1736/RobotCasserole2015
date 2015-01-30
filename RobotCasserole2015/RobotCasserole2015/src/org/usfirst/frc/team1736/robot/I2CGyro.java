@@ -45,13 +45,61 @@ public class I2CGyro {
 	//Nominal Z value
 	public short zero_motion_offset;
 	
+	//Deadzone - if gyro reading is less than this, assume it's actually zero.
+	public static final double gyro_deadzone = 0.05;
+	
 	//Conversion factor from bits to degrees per sec
 	//we hardcode max scale to be 500 degrees per second
 	//full scale is a signed 16 bit number
 	//so the conversion is 500/(MAX_INT_16)
 	private static final double degPerSecPerLSB = 0.01525925;
 	
-	private Thread gyro_read_thread;
+	private long system_time_at_last_call = 0;
+	private boolean periodic_called_once = false;
+	
+	
+	//Filter Constants
+	private static final int FILTER_LENGTH = 27;
+	
+	//coefficents for a low-pass-filter
+	//27 tap FIR, sampling frequency of 50Hz
+	//passband from 0 to 10 Hz, 4.06db ripple, unit gain
+	//stopband from 12 to 25 Hz, -40.23db ripple
+	private static final double[] FILTER_COEFS = {
+		0.008630882178726856,
+		0.041305991054314525,
+		0.05886136073477571,
+		0.03686795552479373,
+		-0.016953072341001792,
+		-0.040853244115447225,
+		-0.00033666281168864186,
+		0.050871136082244466,
+		0.026656021882141712,
+		-0.0616917753456848,
+		-0.08155386643224148,
+		0.069639050952534,
+		0.3096965081057878,
+		0.427464797306881,
+		0.3096965081057878,
+		0.069639050952534,
+		-0.08155386643224148,
+		-0.0616917753456848,
+		0.026656021882141712,
+		0.050871136082244466,
+		-0.00033666281168864186,
+		-0.040853244115447225,
+		-0.016953072341001792,
+		0.03686795552479373,
+		0.05886136073477571,
+		0.041305991054314525,
+		0.008630882178726856,	
+	};
+	
+	//circular buffer to hold filter input
+	private double[] filter_circ_buffer = new double[FILTER_LENGTH];
+	//index to latest value in buffer
+	//should be mathed modulo FILTER_LENGTH
+	private int filter_buf_start_pointer = 0;
 	
 	
 	//Constructor initalizes the data associated with the gyro, starts talking to it over I2C
@@ -60,6 +108,8 @@ public class I2CGyro {
 	//sets the zero-offset value
 	I2CGyro(){ 
 		byte[] rx_byte = {0};
+		
+		filter_buf_start_pointer = 0;
 		
 		gyro = new I2C(Port.kOnboard, I2C_ADDR);
 		
@@ -134,15 +184,50 @@ public class I2CGyro {
 		byte[] buffer_low_and_high_bytes = {0, 0}; //buffer for I2C to read into
 		gyro.read(OUTZ_L_REG_ADDR|AUTO_INCRIMENT_REG_PTR_MASK, 2, buffer_low_and_high_bytes); //read high and low bytes.
 		short ret_val = (short)(((buffer_low_and_high_bytes[1] << 8) | (buffer_low_and_high_bytes[0] & 0xFF)) - (short)zero_motion_offset);
-		System.out.println(ret_val);
 		return (ret_val); //assemble bytes into 16 bit result
 		
 	}
 	
 
 	public void periodic_update() { 
-			gyro_z_val_deg_per_sec = (double)read_gyro_z_reg()*degPerSecPerLSB;
-			angle = angle + (double)GYRO_READ_PERIOD_MS*gyro_z_val_deg_per_sec/1000;
+		    if(periodic_called_once == false) {
+		    	periodic_called_once = true;
+		    	system_time_at_last_call = System.nanoTime();
+		    }
+		    else{
+				//gyro_z_val_deg_per_sec = gyro_LP_filter((double)read_gyro_z_reg()*degPerSecPerLSB);
+		    	long cur_period_ns = (System.nanoTime() - system_time_at_last_call);
+		    	System.out.println("Period = " + cur_period_ns/1000000000l);
+				gyro_z_val_deg_per_sec = (double)read_gyro_z_reg()*cur_period_ns/1000000000l;
+				if(gyro_z_val_deg_per_sec < gyro_deadzone && gyro_z_val_deg_per_sec > -gyro_deadzone)
+					gyro_z_val_deg_per_sec = 0;
+				angle = angle + (double)cur_period_ns/1000000000l*gyro_z_val_deg_per_sec;
+				system_time_at_last_call = System.nanoTime();
+		    }
 	}
+	
+	//Lowpass filter for gyro.
+	//Shifts a new value into the circular buffer
+	//outputs the current filter value	
+	private double gyro_LP_filter(double input){
+		int circ_buffer_index = 0;
+		double accumulator = 0;
+		filter_circ_buffer[filter_buf_start_pointer] = input;
+		
+		for(int i = 0; i < FILTER_LENGTH; i++){
+			//Calculate this loop's filter coefficients
+			if((filter_buf_start_pointer - i) >= 0)
+				circ_buffer_index = (filter_buf_start_pointer - i) % FILTER_LENGTH;
+			else
+				circ_buffer_index = ((filter_buf_start_pointer - i) % FILTER_LENGTH)+FILTER_LENGTH;
+			
+			accumulator += filter_circ_buffer[circ_buffer_index]*FILTER_COEFS[i]; //add up filter buffer multiplied by coefficents
+
+		}
+		
+		filter_buf_start_pointer = (filter_buf_start_pointer + 1) % FILTER_LENGTH ; //shift buffer
+		return accumulator; //return filter value
+	}
+
 
 }
