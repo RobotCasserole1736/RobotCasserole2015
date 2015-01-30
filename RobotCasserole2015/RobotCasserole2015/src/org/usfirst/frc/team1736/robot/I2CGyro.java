@@ -12,7 +12,7 @@ public class I2CGyro {
 	I2C gyro; //wpilibj object for an i2c device
 	
 	//I2C device address
-	private static final int I2C_ADDR = 0b00110100; //Assume SDO is grounded
+	private static final int I2C_ADDR = 0b01101000; //Assume SDO is grounded
 	
 	//Gyro internal register addresses
 	private static final int WHOAMI_REG_ADDR = 0x0F;
@@ -25,15 +25,16 @@ public class I2CGyro {
 	private static final int OUTZ_L_REG_ADDR = 0x2C;
 	private static final int OUTZ_H_REG_ADDR = 0x2D;
 	private static final int STATUS_REG_ADDR = 0x27;
+	private static final int AUTO_INCRIMENT_REG_PTR_MASK = 0x80;
 	
 	//Expected contents of the WHOAMI register
 	private static final byte WHOAMI_EXPECTED = (byte) 0b11010011;
 	
 	//integrator result (current angle)
-	private double angle;
+	private volatile double angle;
 	
 	//current angular velocity
-	private double gyro_z_val_deg_per_sec;
+	private volatile double gyro_z_val_deg_per_sec;
 	
 	//how frequently the gyro gets read
 	public static final int GYRO_READ_PERIOD_MS = 20;
@@ -48,7 +49,7 @@ public class I2CGyro {
 	//we hardcode max scale to be 500 degrees per second
 	//full scale is a signed 16 bit number
 	//so the conversion is 500/(MAX_INT_16)
-	private static final double degPerSecPerLSB = 500/32767;
+	private static final double degPerSecPerLSB = 0.01525925;
 	
 	private Thread gyro_read_thread;
 	
@@ -100,9 +101,15 @@ public class I2CGyro {
 		zero_motion_offset = 0;
 		double gyro_zero_read_accumulator = 0;
 		for(int i = 0; i < GYRO_INIT_READS; i++){
-			gyro_zero_read_accumulator += read_gyro_z_reg();
+			gyro_zero_read_accumulator += (double)read_gyro_z_reg();
+			try {
+				Thread.sleep(10);
+			} catch (InterruptedException e) {
+				System.out.println("ERROR YOU INTERRUPTED ME WHILE I'm SLEEPING!!!");
+				e.printStackTrace();
+			}
 		}
-		zero_motion_offset = (short)(gyro_zero_read_accumulator/(double)GYRO_INIT_READS);
+		zero_motion_offset = (short)((double)gyro_zero_read_accumulator/(double)GYRO_INIT_READS);
 		System.out.println("Done! \nDetermined a zero-offset of " + zero_motion_offset);
 		
 		
@@ -125,15 +132,17 @@ public class I2CGyro {
 	
 	private short read_gyro_z_reg(){
 		byte[] buffer_low_and_high_bytes = {0, 0}; //buffer for I2C to read into
-		gyro.read(OUTZ_L_REG_ADDR, 2, buffer_low_and_high_bytes); //read high and low bytes. 
-		return (short) ((short)((buffer_low_and_high_bytes[1]<<8)|(buffer_low_and_high_bytes[0])) - zero_motion_offset); //assemble bytes into 16 bit result
+		gyro.read(OUTZ_L_REG_ADDR|AUTO_INCRIMENT_REG_PTR_MASK, 2, buffer_low_and_high_bytes); //read high and low bytes.
+		short ret_val = (short)(((buffer_low_and_high_bytes[1] << 8) | (buffer_low_and_high_bytes[0] & 0xFF)) - (short)zero_motion_offset);
+		System.out.println(ret_val);
+		return (ret_val); //assemble bytes into 16 bit result
 		
 	}
 	
 
 	public void periodic_update() { 
-			gyro_z_val_deg_per_sec = read_gyro_z_reg()*degPerSecPerLSB;
-			angle = angle + GYRO_READ_PERIOD_MS*gyro_z_val_deg_per_sec;
+			gyro_z_val_deg_per_sec = (double)read_gyro_z_reg()*degPerSecPerLSB;
+			angle = angle + (double)GYRO_READ_PERIOD_MS*gyro_z_val_deg_per_sec/1000;
 	}
 
 }
