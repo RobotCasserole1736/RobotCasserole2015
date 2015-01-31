@@ -2,6 +2,7 @@
 package org.usfirst.frc.team1736.robot;
 
 import edu.wpi.first.wpilibj.IterativeRobot;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
 /**
  * The VM is configured to automatically run this class, and to call the
@@ -38,14 +39,17 @@ public class Robot extends IterativeRobot {
     }
     
     @Override
-    public void testInit(){
+    public void testInit(){ 
     }
     /**
      * This function is called periodically during test mode
      */
     public void testPeriodic() {
     	System.out.println("Gyro Val = " + testgyro.get_gyro_z() + " Gyro Angle = " + testgyro.get_gyro_angle());
-    
+    	SmartDashboard.putNumber("Gyro Value", testgyro.get_gyro_z());
+    	SmartDashboard.putNumber("Gyro Angle", testgyro.get_gyro_angle());
+    	SmartDashboard.putNumber("Gyro Value (RAW)", testgyro.get_gyro_z_raw());
+    	
     }
     
 }

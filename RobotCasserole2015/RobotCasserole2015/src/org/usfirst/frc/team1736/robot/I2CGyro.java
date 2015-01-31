@@ -17,7 +17,7 @@ public class I2CGyro {
 	
 	java.util.Timer m_controlLoop;
 
-	double m_period = 20;
+	double m_period_multithread = 10;
 	
 	//I2C device address
 	private static final int I2C_ADDR = 0b01101000; //Assume SDO is grounded
@@ -41,30 +41,36 @@ public class I2CGyro {
 	//integrator result (current angle)
 	private volatile double angle;
 	
-	//current angular velocity
-	private volatile double gyro_z_val_deg_per_sec;
-	
-	//how frequently the gyro gets read
-	public static final int GYRO_READ_PERIOD_MS = 20;
+	//Buffer for current and previous gyro values
+	//[0] is current, [1] is prev, [2] is prev. prev....
+	private volatile double[] gyro_z_val_deg_per_sec = {0, 0, 0};
 	
 	//how many times we read the gyro at the start to figure out the zero-offset
-	public static final int GYRO_INIT_READS = 50;
+	public static final int GYRO_INIT_READS = 500;
 	
 	//Nominal Z value
 	public short zero_motion_offset;
 	
+	//Max range before we declare the gyro overloaded
+	private final short gyro_max_limit = 0x7FF0;
+	
 	//Deadzone - if gyro reading is less than this, assume it's actually zero.
-	public static final double gyro_deadzone = 0.05;
+	public static final double gyro_deadzone = 0.0;
 	
 	//Conversion factor from bits to degrees per sec
 	//we hardcode max scale to be 500 degrees per second
 	//full scale is a signed 16 bit number
 	//so the conversion is 500/(MAX_INT_16)
-	private static final double degPerSecPerLSB = 0.01525925;
+	private static final double degPerSecPerLSB = 500.0/32767;
 	
 	private long system_time_at_last_call = 0;
 	private boolean periodic_called_once = false;
 	
+	//state for calculating simpsons method of numerical integration
+	private volatile int cur_interrupt_state = 0;
+	//0 means no data in buffers yet
+	//1 means 1 datapoint in buffer.
+	//2 means two pieces of data in buffer. Add a third and calculate output!
 	
 	//Filter Constants
 	private static final int FILTER_LENGTH = 27;
@@ -132,7 +138,7 @@ public class I2CGyro {
 		//Enable all three axes, and disable power down.
 		//Yes, this is one of these devices which defaults to powered off.
 		//It's stupid.
-		gyro.write(CTRL_REG1_ADDR, 0b00001111);
+		gyro.write(CTRL_REG1_ADDR, 0b11111111);
 		
 		//Disable onboard High Pass Filter
 		gyro.write(CTRL_REG2_ADDR, 0b00000000);
@@ -171,18 +177,23 @@ public class I2CGyro {
 		System.out.println("Done! \nDetermined a zero-offset of " + zero_motion_offset);
 		
         m_controlLoop = new java.util.Timer();
-        m_controlLoop.schedule(new GyroTask(this), 0L, (long) (m_period * 1000));
+        m_controlLoop.schedule(new GyroTask(this), 0L, (long) (m_period_multithread));
 		
 	}
 	
 	public synchronized double get_gyro_z(){
-		return gyro_z_val_deg_per_sec;
+		return gyro_z_val_deg_per_sec[0];
 	}
 	
 	//return the gyro angle (in degrees from 0 to 360)
 	public synchronized double get_gyro_angle(){
 		return angle;
 		
+	}
+	
+	//return the raw value from the gyro
+	public synchronized double get_gyro_z_raw(){
+		return (double)read_gyro_z_reg();
 	}
 	
 	//reset the current angle to zero
@@ -194,26 +205,36 @@ public class I2CGyro {
 		byte[] buffer_low_and_high_bytes = {0, 0}; //buffer for I2C to read into
 		gyro.read(OUTZ_L_REG_ADDR|AUTO_INCRIMENT_REG_PTR_MASK, 2, buffer_low_and_high_bytes); //read high and low bytes.
 		short ret_val = (short)(((buffer_low_and_high_bytes[1] << 8) | (buffer_low_and_high_bytes[0] & 0xFF)) - (short)zero_motion_offset);
+		if(ret_val > gyro_max_limit || ret_val < -gyro_max_limit)
+			System.out.println("!!!!!WARNING GYRO VALUE HAS OVERLOADED!!!!!!!!!!");
 		return (ret_val); //assemble bytes into 16 bit result
 		
 	}
 	
 
-	public synchronized void periodic_update() { 
-		    if(periodic_called_once == false) {
-		    	periodic_called_once = true;
-		    	system_time_at_last_call = System.nanoTime();
-		    }
-		    else{
-				//gyro_z_val_deg_per_sec = gyro_LP_filter((double)read_gyro_z_reg()*degPerSecPerLSB);
-		    	long cur_period_ns = (System.nanoTime() - system_time_at_last_call);
-		    	System.out.println("Period = " + cur_period_ns/1000000000l);
-				gyro_z_val_deg_per_sec = (double)read_gyro_z_reg()*cur_period_ns/1000000000l;
-				if(gyro_z_val_deg_per_sec < gyro_deadzone && gyro_z_val_deg_per_sec > -gyro_deadzone)
-					gyro_z_val_deg_per_sec = 0;
-				angle = angle + (double)cur_period_ns/1000000000l*gyro_z_val_deg_per_sec;
-				system_time_at_last_call = System.nanoTime();
-		    }
+	public synchronized void periodic_update() {
+		long cur_period_start_time = System.nanoTime();
+		//shift existing values
+    	gyro_z_val_deg_per_sec[2] = gyro_z_val_deg_per_sec[1];
+    	gyro_z_val_deg_per_sec[1] = gyro_z_val_deg_per_sec[0];
+    	gyro_z_val_deg_per_sec[0] = gyro_LP_filter((double)read_gyro_z_reg()*degPerSecPerLSB);
+    	//Apply deadzone
+		if(gyro_z_val_deg_per_sec[0] < gyro_deadzone && gyro_z_val_deg_per_sec[0] > -gyro_deadzone)
+			gyro_z_val_deg_per_sec[0] = 0;
+	
+	    if(cur_interrupt_state == 0) { //initalize variables on first call of asynchronous function
+	    	system_time_at_last_call = cur_period_start_time;
+	    	cur_interrupt_state = 1;
+	    }
+	    else if(cur_interrupt_state == 1) {
+	    	cur_interrupt_state = 2;
+	    }
+	    else if(cur_interrupt_state == 2) {
+	    	long cur_period_ns = (cur_period_start_time - system_time_at_last_call);
+			angle = angle + (double)cur_period_ns/(double)1000000000 * 1/6 * (gyro_z_val_deg_per_sec[2] + 4*gyro_z_val_deg_per_sec[1] + gyro_z_val_deg_per_sec[0]); //simpson's method
+			system_time_at_last_call = cur_period_start_time;
+			cur_interrupt_state = 1; 
+	    }
 	}
 	
 	//Lowpass filter for gyro.
