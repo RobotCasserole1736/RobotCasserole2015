@@ -4,12 +4,20 @@
 // Includes filtering and descrete integral for angle calculation.
 
 package org.usfirst.frc.team1736.robot;
+import java.util.TimerTask;
+
 import edu.wpi.first.wpilibj.I2C;
 import edu.wpi.first.wpilibj.I2C.Port;
 
 
 public class I2CGyro {
 	I2C gyro; //wpilibj object for an i2c device
+	
+	I2CGyro m_gyro;
+	
+	java.util.Timer m_controlLoop;
+
+	double m_period = 20;
 	
 	//I2C device address
 	private static final int I2C_ADDR = 0b01101000; //Assume SDO is grounded
@@ -162,25 +170,27 @@ public class I2CGyro {
 		zero_motion_offset = (short)((double)gyro_zero_read_accumulator/(double)GYRO_INIT_READS);
 		System.out.println("Done! \nDetermined a zero-offset of " + zero_motion_offset);
 		
+        m_controlLoop = new java.util.Timer();
+        m_controlLoop.schedule(new GyroTask(this), 0L, (long) (m_period * 1000));
 		
 	}
 	
-	public double get_gyro_z(){
+	public synchronized double get_gyro_z(){
 		return gyro_z_val_deg_per_sec;
 	}
 	
 	//return the gyro angle (in degrees from 0 to 360)
-	public double get_gyro_angle(){
+	public synchronized double get_gyro_angle(){
 		return angle;
 		
 	}
 	
 	//reset the current angle to zero
-	public void reset_gyro_angle(){
+	public synchronized void reset_gyro_angle(){
 		angle = 0;		
 	}
 	
-	private short read_gyro_z_reg(){
+	private synchronized short read_gyro_z_reg(){
 		byte[] buffer_low_and_high_bytes = {0, 0}; //buffer for I2C to read into
 		gyro.read(OUTZ_L_REG_ADDR|AUTO_INCRIMENT_REG_PTR_MASK, 2, buffer_low_and_high_bytes); //read high and low bytes.
 		short ret_val = (short)(((buffer_low_and_high_bytes[1] << 8) | (buffer_low_and_high_bytes[0] & 0xFF)) - (short)zero_motion_offset);
@@ -189,7 +199,7 @@ public class I2CGyro {
 	}
 	
 
-	public void periodic_update() { 
+	public synchronized void periodic_update() { 
 		    if(periodic_called_once == false) {
 		    	periodic_called_once = true;
 		    	system_time_at_last_call = System.nanoTime();
@@ -209,7 +219,7 @@ public class I2CGyro {
 	//Lowpass filter for gyro.
 	//Shifts a new value into the circular buffer
 	//outputs the current filter value	
-	private double gyro_LP_filter(double input){
+	private synchronized double gyro_LP_filter(double input){
 		int circ_buffer_index = 0;
 		double accumulator = 0;
 		filter_circ_buffer[filter_buf_start_pointer] = input;
@@ -229,5 +239,24 @@ public class I2CGyro {
 		return accumulator; //return filter value
 	}
 
+    private class GyroTask extends TimerTask 
+    {
+        private I2CGyro m_gyro;
+
+        public GyroTask(I2CGyro gyro) 
+        {
+            if (gyro == null) 
+            {
+                throw new NullPointerException("Given PIDController was null");
+            }
+            m_gyro = gyro;
+        }
+
+        @Override
+        public void run() 
+        {
+            m_gyro.periodic_update();
+        }
+    }
 
 }

@@ -18,7 +18,8 @@ public class Robot extends IterativeRobot {
      * used for any initialization code.
      */
     public void robotInit() {
-
+    	testgyro = new I2CGyro();
+    	
 
     }
 
@@ -38,13 +39,11 @@ public class Robot extends IterativeRobot {
     
     @Override
     public void testInit(){
-    	testgyro = new I2CGyro();
     }
     /**
      * This function is called periodically during test mode
      */
     public void testPeriodic() {
-    	testgyro.periodic_update();
     	System.out.println("Gyro Val = " + testgyro.get_gyro_z() + " Gyro Angle = " + testgyro.get_gyro_angle());
     
     }
