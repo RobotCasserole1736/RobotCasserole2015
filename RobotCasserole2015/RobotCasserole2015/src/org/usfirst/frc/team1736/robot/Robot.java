@@ -113,13 +113,15 @@ public class Robot extends IterativeRobot {
     	frontRightMotor = new VictorSP(RIGHTROBOT_FRONTMOTOR_ID);
     	backRightMotor = new VictorSP(RIGHTROBOT_BACKMOTOR_ID);
     	slideMotor = new VictorSP(SLIDE_MOTOR_ID);
-    	//Drive Train
-    	slideTrain = new SlideTrain(frontLeftMotor, backLeftMotor, frontRightMotor, backRightMotor, slideMotor, P, I, D);
-    	slideTrain.enable();
+    	//Gyro
     	gyro = new Gyro(GYRO_ID);
 		gyro.initGyro();
 		gyro.setPIDSourceParameter(PIDSourceParameter.kAngle);
 		gyro.setSensitivity(GYRO_SENSITIVITY);
+    	//Drive Train
+    	slideTrain = new SlideTrain(frontLeftMotor, backLeftMotor, frontRightMotor, backRightMotor, slideMotor, gyro, P, I, D);
+    	slideTrain.enable();
+    	//Compressor
 		compressor = new Compressor();
 		pressureSensor = new AnalogInput(PRESSURE_SENSOR_ID);
 		
@@ -172,7 +174,7 @@ public class Robot extends IterativeRobot {
     	
     	//Run either open- or closed-loop control, depending on what is requested
     	if(!openLoop)
-    		slideTrain.PIDarcadeDrive(joy1.getDirectionRadians(), joy1.getMagnitude(), joy1.getRawAxis(XBOX_RSTICK_XAXIS), true, gyroValue);
+    		slideTrain.PIDarcadeDrive(joy1.getDirectionRadians(), joy1.getMagnitude(), joy1.getRawAxis(XBOX_RSTICK_XAXIS), true);
     	else
     		slideTrain.arcadeDrive((-1 *joy1.getRawAxis(XBOX_LSTICK_YAXIS)), joy1.getRawAxis(XBOX_RSTICK_XAXIS), joy1.getRawAxis(XBOX_LSTICK_XAXIS), slideTune, true);
     	if(!slideTrain.getPIDController().isEnable())

@@ -1,5 +1,7 @@
 package org.usfirst.frc.team1736.robot;
 
+import edu.wpi.first.wpilibj.Encoder;
+import edu.wpi.first.wpilibj.Gyro;
 import edu.wpi.first.wpilibj.SpeedController;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.command.PIDSubsystem;
@@ -12,6 +14,16 @@ public class SlideTrain extends PIDSubsystem{
     protected SpeedController backLeftMotor;
     protected SpeedController backRightMotor;
     protected SpeedController slideMotor;
+    protected Gyro gyro = null;
+    
+    protected Encoder leftEncoder;
+    protected Encoder rightEncoder;
+    
+    final static int leftEncoderID = 0;
+    final static int leftEncoderID_2 = 1;
+    
+    final static int rightEncoderID = 2;
+    final static int rightEncoderID_2 = 3;
     
 	double frontLeftMotorValue;
 	double frontRightMotorValue;
@@ -41,11 +53,9 @@ public class SlideTrain extends PIDSubsystem{
     final int PIDWaitLoop = 20;
     
     static double lastTime = 0;
-    
-    volatile double gyroValue; //current output from the gyroscope in Radians
 	
 	public SlideTrain(SpeedController leftFrontMotor, SpeedController leftBackMotor, SpeedController rightFrontMotor, 
-					  SpeedController rightBackMotor, SpeedController slideMotor, double P, double I, double D)
+					  SpeedController rightBackMotor, SpeedController slideMotor, Gyro gyro, double P, double I, double D)
 	{
 		super("SlideTrain",P,I,D);
 		this.frontLeftMotor = leftFrontMotor;
@@ -53,6 +63,11 @@ public class SlideTrain extends PIDSubsystem{
 		this.backLeftMotor = leftBackMotor;
 		this.backRightMotor = rightBackMotor;
 		this.slideMotor = slideMotor;
+		this.gyro = gyro;
+		
+		leftEncoder = new Encoder(leftEncoderID, leftEncoderID_2);
+		rightEncoder = new Encoder(rightEncoderID, rightEncoderID_2);
+		
 		//PID Subsystem stuff
 		getPIDController().setContinuous(true); //Allow the PID algorithm to correct for error by traversing through the 360<->0 degrees.
 		                                        //this is allowable because rotation is continuous (as supposed to a slide motion)
@@ -100,20 +115,26 @@ public class SlideTrain extends PIDSubsystem{
 	}
 	
 	//Closed loop control
-	public void PIDarcadeDrive(double lDirectionRad, double lMagnitude, double R_XAxis, boolean squaredInputs, double gyroValue)
+	public void PIDarcadeDrive(double lDirectionRad, double lMagnitude, double R_XAxis, boolean squaredInputs)
 	{
+		double twistValue = 0;
 		//square the magnititude input if requested (for better low-speed control)
 		if(squaredInputs)
+		{
 			lMagnitude *= lMagnitude;
+			twistValue = R_XAxis/ Math.abs(R_XAxis) * R_XAxis*R_XAxis;
+		}
+		else if(!squaredInputs)
+		{
+			twistValue = R_XAxis;
+		}
 		
 		//make a local copy of the current gyroscope value (radians)
-		this.gyroValue = gyroValue;
+		double gyroValue = getGyroValue();
 		
 		setPointMultiplier = 288 * (Timer.getFPGATimestamp() - lastTime);
 		
 		lastTime = Timer.getFPGATimestamp();
-	
-		double twistValue = R_XAxis/ Math.abs(R_XAxis) * R_XAxis*R_XAxis;
 		
 		//calculate the pose angle setpoint 
 		//increase/decrease the setpoint based on the current value of the 
@@ -203,6 +224,29 @@ public class SlideTrain extends PIDSubsystem{
 		previous_R_XAxis_value = twistValue;
 	}
 	
+	public void PIDTurning(double degrees)
+	{
+		if(degrees >= 0)
+		{
+			setPoint = degrees;
+		}
+		else if(degrees <= 0)
+		{
+			setPoint = 360 - degrees;
+		}
+		
+		setSetpoint(Math.toRadians(setPoint));
+		
+		double m1_rotational = ((-1) * PIDOutput) * K1;
+		double m2_rotational = PIDOutput * K2;
+		
+		frontLeftMotorValue = m1_rotational;
+		backLeftMotorValue = m1_rotational;
+		
+		frontRightMotorValue = m2_rotational;
+		backRightMotorValue = m2_rotational;
+	}
+	
 	//limit an input to the valid range for motor outputs (-1 to 1)
     protected static double limit(double num) {
         if (num > 1.0) {
@@ -214,11 +258,54 @@ public class SlideTrain extends PIDSubsystem{
         return num;
     }
 
+    public void driveStraight(double distance)
+    {
+    	if(leftEncoder.getDistance() < (distance / 2) || rightEncoder.getDistance() < (distance / 2))
+    	{
+    		PIDarcadeDrive(0, 1, 0, false);
+    	}
+    	else if((leftEncoder.getDistance() < ((3/4) * distance)) || (rightEncoder.getDistance() < ((3/4) * distance))) 
+    	
+    	{
+    		PIDarcadeDrive(0, 0.5, 0, false);
+    	}
+    	else if(((leftEncoder.getDistance() >= distance) || (rightEncoder.getDistance() >= distance)))
+    	{
+    		PIDarcadeDrive(0, 0, 0, false);
+    	}
+    }
+    
+    public void turnRight(double degrees)
+    {
+    	PIDTurning(degrees);
+    }
+    
+    public void turnLeft(double degrees)
+    {    	
+    	PIDTurning(-1 * degrees);
+    }
+    
+    public void resetEncoders()
+    {
+    	leftEncoder.reset();
+    	rightEncoder.reset();
+    }
+    
+    public double getGyroValue()
+    {
+    	double gyroValue = (gyro.getAngle()*(Math.PI/180)) % (2*Math.PI);
+    	if(gyro.getAngle() < 0)
+    	{
+    		gyroValue += 2*Math.PI;
+    	}
+    	return gyroValue;
+    }
+    
     //PID controller override. This function is called by the PID controller thread asynchronously from the 
     //rest of the robot code. It should always return the current input value to the PID (for us, this is from the gyroscope)
 	@Override
 	protected double returnPIDInput() {
-		return gyroValue; //in radians
+		return getGyroValue(); //in radians
 	}
 
 	//PID output usage function. 
