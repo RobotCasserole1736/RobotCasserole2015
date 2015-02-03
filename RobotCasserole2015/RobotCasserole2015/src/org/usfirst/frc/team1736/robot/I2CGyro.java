@@ -4,6 +4,7 @@
 // Includes filtering and descrete integral for angle calculation.
 
 package org.usfirst.frc.team1736.robot;
+import java.util.Arrays;
 import java.util.TimerTask;
 
 import edu.wpi.first.wpilibj.I2C;
@@ -55,16 +56,20 @@ public class I2CGyro {
 	private final short gyro_max_limit = 0x7FF0;
 	
 	//Deadzone - if gyro reading is less than this, assume it's actually zero.
-	public static final double gyro_deadzone = 0.0;
+	public static final double gyro_deadzone = 0.1; //(in deg/sec)
 	
 	//Conversion factor from bits to degrees per sec
-	//we hardcode max scale to be 500 degrees per second
+	//we hardcode max scale to be 2000 degrees per second
 	//full scale is a signed 16 bit number
-	//so the conversion is 500/(MAX_INT_16)
-	private static final double degPerSecPerLSB = 500.0/32767;
+	//so the conversion is 2000/(MAX_INT_16)
+	//However, the datasheet says 70mdps. so we use that.
+	private static final double degPerSecPerLSB = 0.07;//2000.0/32767;
 	
 	private long system_time_at_last_call = 0;
 	private boolean periodic_called_once = false;
+	
+	//Gyro integration mode: 0 = linear interpolation, 1 = simpson's method
+	private static final int integration_method = 1;
 	
 	//state for calculating simpsons method of numerical integration
 	private volatile int cur_interrupt_state = 0;
@@ -116,6 +121,10 @@ public class I2CGyro {
 	private int filter_buf_start_pointer = 0;
 	
 	
+	//Median filter length
+	private static final int MED_FILT_LEN= 10;
+	private double[] med_filt_buffer = new double[MED_FILT_LEN];
+	
 	//Constructor initalizes the data associated with the gyro, starts talking to it over I2C
 	//sets inital register values
 	//reads from the gyro a few times to figure out the zero-offset value
@@ -135,28 +144,29 @@ public class I2CGyro {
 		
 		//Control register setup
 		
-		//Enable all three axes, and disable power down.
+		//Set output data rate to 400 and LPF cutoff to 25Hz
+		//Enable only Z axis, and disable power down.
 		//Yes, this is one of these devices which defaults to powered off.
 		//It's stupid.
-		gyro.write(CTRL_REG1_ADDR, 0b11111111);
+		gyro.write(CTRL_REG1_ADDR, 0b10011100);
 		
-		//Disable onboard High Pass Filter
-		gyro.write(CTRL_REG2_ADDR, 0b00000000);
+		//enable High Pass Filter, cutoff at 0.5 Hz
+		gyro.write(CTRL_REG2_ADDR, 0b00100110);
 		
 		//Disable all interrupt trigger pins
-		gyro.write(CTRL_REG3_ADDR, 0b0000000);
+		gyro.write(CTRL_REG3_ADDR, 0b00000000);
 		
-		//Set Full-Scale range to 500Deg/Sec
-		gyro.write(CTRL_REG4_ADDR, 0b00010000);
+		//Set Full-Scale range to 2000Deg/Sec
+		gyro.write(CTRL_REG4_ADDR, 0b00100000);
 
 		//Disable Onboard FIFO
-		gyro.write(CTRL_REG5_ADDR, 0b0000000);
+		gyro.write(CTRL_REG5_ADDR, 0b00000000);
 		
 		//sleep breifly to ensure settings take effect
 		try {
-			Thread.sleep(50);
+			Thread.sleep(10);
 		} catch (InterruptedException e) {
-			System.out.println("ERROR YOU INTERRUPTED ME WHILE I'm SLEEPING!!!");
+			System.out.println("ERROR YOU INTERRUPTED ME WHILE I'm SLEEPING!!! DO NOT WAKE THE ANGRY BEAST!!!!1!!!");
 			e.printStackTrace();
 		}
 		
@@ -212,29 +222,37 @@ public class I2CGyro {
 	}
 	
 
+	@SuppressWarnings("unused")
 	public synchronized void periodic_update() {
 		long cur_period_start_time = System.nanoTime();
 		//shift existing values
     	gyro_z_val_deg_per_sec[2] = gyro_z_val_deg_per_sec[1];
     	gyro_z_val_deg_per_sec[1] = gyro_z_val_deg_per_sec[0];
-    	gyro_z_val_deg_per_sec[0] = gyro_LP_filter((double)read_gyro_z_reg()*degPerSecPerLSB);
+    	gyro_z_val_deg_per_sec[0] = gyro_median_filter((double)read_gyro_z_reg()*degPerSecPerLSB);
     	//Apply deadzone
 		if(gyro_z_val_deg_per_sec[0] < gyro_deadzone && gyro_z_val_deg_per_sec[0] > -gyro_deadzone)
 			gyro_z_val_deg_per_sec[0] = 0;
 	
-	    if(cur_interrupt_state == 0) { //initalize variables on first call of asynchronous function
-	    	system_time_at_last_call = cur_period_start_time;
-	    	cur_interrupt_state = 1;
-	    }
-	    else if(cur_interrupt_state == 1) {
-	    	cur_interrupt_state = 2;
-	    }
-	    else if(cur_interrupt_state == 2) {
-	    	long cur_period_ns = (cur_period_start_time - system_time_at_last_call);
-			angle = angle + (double)cur_period_ns/(double)1000000000 * 1/6 * (gyro_z_val_deg_per_sec[2] + 4*gyro_z_val_deg_per_sec[1] + gyro_z_val_deg_per_sec[0]); //simpson's method
+		if(integration_method == 1) {
+		    if(cur_interrupt_state == 0) { //initalize variables on first call of asynchronous function
+		    	system_time_at_last_call = cur_period_start_time;
+		    	cur_interrupt_state = 1;
+		    }
+		    else if(cur_interrupt_state == 1) {
+		    	cur_interrupt_state = 2;
+		    }
+		    else if(cur_interrupt_state == 2) {
+		    	long cur_period_ns = (cur_period_start_time - system_time_at_last_call);
+				angle = angle + (double)cur_period_ns/(double)1000000000 * 1/6 * (gyro_z_val_deg_per_sec[2] + 4*gyro_z_val_deg_per_sec[1] + gyro_z_val_deg_per_sec[0]); //simpson's method
+				system_time_at_last_call = cur_period_start_time;
+				cur_interrupt_state = 1; 
+		    }
+		}
+		else if(integration_method == 0) {
+			long cur_period_ns = (cur_period_start_time - system_time_at_last_call);
+			angle = angle + (double)cur_period_ns/(double)1000000000 * 1/2 * (gyro_z_val_deg_per_sec[0] + gyro_z_val_deg_per_sec[1]);
 			system_time_at_last_call = cur_period_start_time;
-			cur_interrupt_state = 1; 
-	    }
+		}
 	}
 	
 	//Lowpass filter for gyro.
@@ -259,6 +277,35 @@ public class I2CGyro {
 		filter_buf_start_pointer = (filter_buf_start_pointer + 1) % FILTER_LENGTH ; //shift buffer
 		return accumulator; //return filter value
 	}
+	
+	//returns the median of some values
+	private synchronized double gyro_median_filter(double input){
+		double[] sorted_array = new double[MED_FILT_LEN];
+		
+		//shift the buffer the really slow way.
+		for(int i = MED_FILT_LEN-1; i > 0; i--) {
+			med_filt_buffer[i] = med_filt_buffer[i-1];
+			sorted_array[i] = med_filt_buffer[i-1];
+		}
+		med_filt_buffer[0] = input;
+		sorted_array[0] = input;
+		
+		Arrays.sort(sorted_array);
+		
+	    int middle = sorted_array.length / 2;
+	    if (sorted_array.length % 2 == 0)
+	    {
+	      double left = sorted_array[middle - 1];
+	      double right = sorted_array[middle];
+	      return (left + right) / 2;
+	    }
+	    else
+	    {
+	      return sorted_array[middle];
+	    }
+	
+	}
+	
 
     private class GyroTask extends TimerTask 
     {

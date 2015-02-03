@@ -48,7 +48,6 @@ public class Robot extends IterativeRobot {
     	System.out.println("Gyro Val = " + testgyro.get_gyro_z() + " Gyro Angle = " + testgyro.get_gyro_angle());
     	SmartDashboard.putNumber("Gyro Value", testgyro.get_gyro_z());
     	SmartDashboard.putNumber("Gyro Angle", testgyro.get_gyro_angle());
-    	SmartDashboard.putNumber("Gyro Value (RAW)", testgyro.get_gyro_z_raw());
     	
     }
     
