@@ -11,13 +11,14 @@ import edu.wpi.first.wpilibj.IterativeRobot;
  * directory.
  */
 public class Robot extends IterativeRobot {
-	//This is a test.  Just a comment to check out commits and stuff.
+	YellowToteTracker tracker;
     /**
      * This function is run when the robot is first started up and should be
      * used for any initialization code.
      */
     public void robotInit() {
-
+    	//This line must be called well before (couple of seconds) the OpenCV functions are used
+    	System.load("/usr/local/lib/lib_OpenCV/java/libopencv_java2410.so");
     }
 
     /**
@@ -27,11 +28,16 @@ public class Robot extends IterativeRobot {
 
     }
 
+    public void teleopInit()
+    {
+    	tracker = new YellowToteTracker();
+    }
+    
     /**
      * This function is called periodically during operator control
      */
     public void teleopPeriodic() {
-        
+    	tracker.processImage();
     }
     
     /**
