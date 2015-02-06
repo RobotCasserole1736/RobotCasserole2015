@@ -11,12 +11,14 @@ import edu.wpi.first.wpilibj.IterativeRobot;
  * directory.
  */
 public class Robot extends IterativeRobot {
-	//This is a test.  Just a comment to check out commits and stuff.
     /**
      * This function is run when the robot is first started up and should be
      * used for any initialization code.
      */
+	
+	LIDAR test_lidar =new LIDAR(); 
     public void robotInit() {
+    	
 
     }
 
@@ -33,11 +35,15 @@ public class Robot extends IterativeRobot {
     public void teleopPeriodic() {
         
     }
+    public void testInit(){
+    	test_lidar.start();
+    }
     
     /**
      * This function is called periodically during test mode
      */
     public void testPeriodic() {
+    	System.out.println("Lidar = " + test_lidar.getDistanceIn());
     
     }
     
