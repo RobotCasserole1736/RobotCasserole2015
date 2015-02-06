@@ -57,58 +57,8 @@ public class I2CGyro {
 	///////////////////////////////////////////////////////////////////////////////
 	//I2C constants
 	///////////////////////////////////////////////////////////////////////////////
-	// For a brief primer on what "I2C" is, check out SparkFun's tutorial:
-	// https://learn.sparkfun.com/tutorials/i2c
-	//
-	// Also, reference the wikipedia page:
-	// http://en.wikipedia.org/wiki/I%C2%B2C
-	//
-	// The cliffs-notes on what I2C is:
-	//
-	// I2C is a method of communicating between a processor and an auxilary device.
-	// This communication is accomplished by changing voltages on a bus of wires.
-	// Data is sent in "Serial" fashion (each 1/0 bit is sent one after another).
-	// Any I2C bus will have to consist of a Clock (SCL) line and a Data (SDA) line.
-	// There will also be power supply lines (Vcc and Gnd. Vcc = 3.3V for our gyro).
-	// All devices that are part of the I2C bus are either "Masters" or "Slaves".
-	// There is only one Master device. In our case, it is the RoboRio.
-	// There can be many Slave devices. In our case, the only Slave is the gyro.
-	// To "Control" either the Clock or Data lines is to apply a voltage to them.
-	// Only the Master will control the Clock line.
-	// The Master and Slaves take turns controlling the Data line.
-	// The Master can only communicate with one Slave at a time.
-	// To exchange data, the Master sends three things:
-	//   -First, the device's 7-bit "Address"
-	//   -Second, a single bit indicating "Read" or "Write"
-	//   -Third, a memory address pointing to some location in the Slave's memory registers.
-	// All slaves sit idle until they hear their own address. At this point, they
-	//    start listening to the next things on the bus.
-	// If the Master desires to Write to the Slave, the Master will put more 8-bit 
-	//    packets onto the data bus. The slave will listen for these packets, 
-	//    and write them into its own memory registers at the specified locations.
-	// If the master desires to Read from the Slave, the Master will wait until the
-	//    slave acknowledges that the registers are ready to produce data. 
-	//    -Then, the master controls the Clock line, and the Slave writes data bits
-	//     onto the Data line. 
-	//    -The Master listens for these data bits and stores them.
-	// Although not technically required, the Slave device is almost always set up to
-	//    act like a piece of RAM. The master reads from and writes to the RAM.
-	// You must look at the Datasheet of the slave chip in order to figure out 
-	//    what each register address in the slave device represents.
-	// The registers will usually represent things like configuration (eg, write "10001000
-	//    to enable the device and set its sample rate") or important data
-	//    (eg, "the current rotational velocity in radians/sec")
-	// Our Gyro's datasheet can be found at:
-	//    http://dlnmh9ip6v2uc.cloudfront.net/datasheets/Sensors/Gyros/3-Axis/CD00265057.pdf
-	// READ THE DATASHEET!!!! ALL OF IT!!!!! ALWAYS!!!!!1!!!!
-	//
-	///////////////////////////////////////////////////////////////////////////////
-	
+
 	//I2C device address - the address that the gyro will respond to
-	//Our Gyro actually can have two addresses, you switch between them
-	// by applying Vcc or Gnd to the "SDO" pin on the gyro breakout board.
-	// This is so you could have two gyros on the same I2C line, and be
-	// able to talk to the independently.
 	//This address assumes our gyro has SDO tied to Gnd.
 	private static final int I2C_ADDR = 0b01101000; 
 	
@@ -124,29 +74,11 @@ public class I2CGyro {
 	private static final int OUTZ_L_REG_ADDR = 0x2C;
 	private static final int OUTZ_H_REG_ADDR = 0x2D;
 	
-	//When reading multiple bytes from the gyro, you have
-	//the option of causing the pointer into the gyro's memory
-	//registers to "auto-increment". This means that after each
-	//read, the pointer will be moved to point to the next register.
-	//This means that the communication can occur almost twice as fast.
-	//It is only useful when reading consecutive registers in a short
-	//  period of time.
-	//Without auto-increment, you would have to send 
-	// "mem_addr, read, next mem_addr, read, next mem_addr, read," etc...
-	//But with auto-increment, you can instead just send
-	// "mem_addr, read, read, read, read, ..."
-	//See? You get your reads faster!
 	//In order to use this variable, bitwise OR it with the first register
 	//you want to read from, and then read multiple bytes.
 	private static final int AUTO_INCRIMENT_REG_PTR_MASK = 0x80;
 	
 	//Expected contents of the WHOAMI register
-	//The WHOAMI (who am I?) register contains some magic number
-	//that is always the same. This is useful because upon first connecting
-	//with the gyro, we can read this register, and compare it to this
-	//expected value. If they match, we can be very confident that we are
-	//actually talking with the gyro, and not some other device that 
-	//got hooked up by accident.
 	private static final byte WHOAMI_EXPECTED = (byte) 0b11010011;
 	
 	///////////////////////////////////////////////////////////////////////////////
@@ -154,29 +86,16 @@ public class I2CGyro {
 	///////////////////////////////////////////////////////////////////////////////
 	
 	//The current angle, as measured by the gyroscope
-	//'Volatile' because it gets touched by multiple threads asynchronously
-	// Volatile will tell the processor that every time it needs to use this
-	// variable, it MUST go fetch it from main system memory, and not use
-	// a cached value (since another thread may have updated it since the
-	// cached value was updated)
 	private volatile double angle;
 	
 	//Buffer for current and previous gyro values
 	//[0] is current, [1] is the previous value, [2] is the previous previous value....
 	//It is required that we store the last three gyro readings for our integration 
-	// method. This will be discussed in greater detail later on.
+	// method. 
 	private volatile double[] gyro_z_val_deg_per_sec = {0, 0, 0};
 	
 	
-	//When we start up the robot, the gyro might not actually read zero
-	// when not moving. To estimate what this "stationary reading offset" is,
-	// we will just read the gyro a poop-ton of times right at startup. 
-	//We assume since this occurs within a few seconds of turning on the
-	// robot and before autonomous or teleop starts, the robot will be still.
-	//Since the robot is still, we just average all the readings we take at startup
-	// and call that the "stationary reading offset". This constant defines
-	// how many readings to take. More will make the zero-offset more accurate
-	// but take longer at startup.
+	//Number of reads to do on init
 	public static final int GYRO_INIT_READS = 500;
 	
 	//Nominal Z value
@@ -185,47 +104,14 @@ public class I2CGyro {
 	public short zero_motion_offset;
 	
 	//Max range before we declare the gyro overloaded
-	//It's just an arbitrary limit we set before we spit
-	//out warnings to the console to warn the developer
-	//the angle is no longer accurate, due to the output of the 
-	//gyro saturating.
 	private final short gyro_max_limit = 0x7FB0; //directly in bits, same scale as gyro's registers
 	
-	//Deadzone - if gyro reading is less than this, assume it's actually zero.
-	//This needs to be very small, as even small gyro values will add up to the
-	//angle. Making this more than zero will help reduce the effects of noise
-	//in the gyro reading, but also technically reduces angle accuracy by a lot
-	//if this is too big. Trial and Error (and sweat, blood, and tears) determined that
-	// 0.1 seems to work as a good deadzone.
-	//If the gyro seems like it's drifting in angle measurement, increase this a bit. If the 
-	//angle is not correct during rotation, reduce this.
+	//Deadzone 
 	public static final double gyro_deadzone = 0.1; //(in deg/sec)
 	
 	//Conversion factor from bits to degrees per sec
-	//The gyro has only 16 bits to represent the rotational velocity.
-	//But you can configure the sensitivity of the gyro to measure 
-	// up to 200, 500, or 2000 degrees/sec. The gyro attempts to map
-	// these ranges to the 16 bits. Remember that a 16 bit number can only
-	// represent 2^16 different things, so increasing the deg/sec setting
-	// makes you have a coarser granularity per bit.
-	//
-	//None of that is really important cuz we NEED the gyro fixed at 2000 deg/s
-	//
-	//So don't worry about that first paragraph. yah...
-	//
-	//This 0.07 number is just a constant that comes from the sensor datasheet.
-	//It tells you how to convert from a sensor reading in raw bits to a
-	// meaningful physical value.
 	private static final double degPerSecPerLSB = 0.07;
 	
-	
-	//To accurately determine the angle, we need to know precisely how much time
-	// elapsed from the last time we read the gyro to the current time we read the gyro.
-	//We will use the built in java System.nanoTime(), which returns
-	// the time the program has been running in nanoseconds (very accurate! yay!).
-	//We will mark the time at the start of each periodic loop, and store the previous
-	//start time in this variable. To figure out the time between samples, we just subtract
-	//the previous time reading from the current one. This variable will store the old value.
 	private long system_time_at_last_call = 0;
 	
 	//To calculate the integral, we have a small state machine. In order to
@@ -237,173 +123,6 @@ public class I2CGyro {
 	private boolean periodic_called_once = false;
 	
 	//Gyro integration mode: 0 = linear interpolation, 1 = simpson's method
-	//
-	// "Integration" is a fancy schmancy calculus thing.
-	// Integration is a fancy schmancy way of saying "summation"
-	// Since this is a computer, we only deal with descrete time points.
-	// Here's an easy way to visualize an integral:
-	// Imagine we have some function of time (say, our gyro angular velocity, changing over time).
-	// Here is some "artistic" ascii art of this:
-	//
-	//   (angular velocity in deg/s)
-	//   ^
-	//300|
-	//   |
-	//   |
-	//   |
-	//200|
-	//   |        -------------
-	//   |       /              \
-	//   |      /                \
-	//   |     /                  \
-	//100|-----                    \
-	//   |                          \
-	//   |                           `~~~~~~~~~~~~~~~~~~~~
-	//   |
-	//   +-----+-------+-------+-------+-------+-------+------> (time (sec))
-	//         1       2       3       4       5       6
-	//
-	// Notice how the angular velocity starts off at about 100 deg/s, goes up to like 180ish, 
-	// then back down to 50, more or less.
-	//
-	// For reasons that are remarkably uninteresting, unless you freakin love math, 
-	// the "Integral of gyro angular velocity" over some period of time is equal
-	// to the area of the space bounded by the time axis, the curve, and the range of
-	// time in question.
-	// 
-	// For example, given the above curve, the Integral of our gyro angular velocity
-	// from 1 second to 2 seconds can be calculated by figuring out the area 
-	// "shaded in" with the character "%":
-	//
-	//   (angular velocity in deg/s)
-	//   ^
-	//300|
-	//   |
-	//   |
-	//   |
-	//200|
-	//   |        -------------
-	//   |       /%%%%%%        \
-	//   |      /%%%%%%%         \
-	//   |     /%%%%%%%%          \
-	//100|-----%%%%%%%%%           \
-	//   |     %%%%%%%%%            \
-	//   |     %%%%%%%%%             `~~~~~~~~~~~~~~~~~~~~
-	//   |     %%%%%%%%% 
-	//   +-----+-------+-------+-------+-------+-------+------> (time (sec))
-	//         1       2       3       4       5       6
-	//
-	// Judging roughly by the numbers involved, the height of that shaded area is about
-	// 180ish, and its width is 1, so the integral is around 180. This is how you calculate
-	// integrals.
-	//
-	// Because physics, the Integral of Angular Velocity is Angle.
-	//
-	// We read angular velocity at regular intervals from the gyroscope.
-	// Getting those values is the multithreaded part of this software is supposed to do.
-	// Then we must integrate them to figure out the angle.
-	//
-	// There is one problem, probably one you won't deal with in your Calc 1 course.
-	//
-	// The issue is that when we read the values from the gyro, we only know the angular
-	// velocity at discrete, non-continuous points in time. We must assume something about what
-	// the angular velocity does IN BETWEEN our readings in order to actually calculate an integral
-	//
-	//   (angular velocity in deg/s)
-	//   ^
-	//300|
-	//   |
-	//   |
-	//   |
-	//200|     0 <- Known sample from gyro
-	//   |     |
-	//   |     |
-	//   |     |
-	//   |     |         <what happens here???>
-	//100|     |       
-	//   |     |
-	//   |     |                                       0 <- Known sample from gyro
-	//   |     |                                       |
-	//   +-----+---------------------------------------+------> (time (samples))
-	//         1                                       2
-	// There are a number of ways to do this. 
-	//
-	// The easiest thing to do is assume that between our samples, the velocity just goes
-	// in a straight line from point to point. We forget for a moment what the line actually
-	// looks like, and just assume it's a line. This produces some nice results:
-	//
-	// This means that the integral between any two points is just the area of a 
-	// trapezoid. This area is just (height_1 + height_2)/2 * base.
-	// ---Base = time between samples, height_1 = prev sample, height_2 = current sample
-	//
-	//   (angular velocity in deg/s)
-	//   ^
-	//300|
-	//   |
-	//   |
-	//   |
-	//200|     0 <- Known sample from gyro
-	//   |     |\
-	//   |     | \
-	//   |     |  \  <-assumed linear line between samples
-	//   |     |   \     
-	//100|     |    \   
-	//   |     |int- \
-	//   |     |egral 0 <- Known sample from gyro
-	//   |     |here  |
-	//   +-----+------+------> (time (samples))
-	//         1      2     
-	//
-	// If we do this for every new sample and keep adding up the integrals, we will
-	// ideally arrive at the current angle. Note this is a summation. Aka an integrall.
-	// 
-	// Integral = summation of things. In this case, trapezoids.
-	//
-	// However, we can probably do better. If we have THREE points, we can instead assume
-	// that a PARABOLA exists between the three samples. As you may or may not know, this is 
-	// possible because any three points can be used to define a parabola. 
-	//
-	//
-	//   (angular velocity in deg/s)
-	//   ^
-	//300|
-	//   |
-	//   |
-	//   |
-	//200|     0 <- Known samples from gyro
-	//   |     |\          |
-	//   |     | |         |         0 <- Known sample from gyro
-	//   |     |  \        |       / |
-	//   |     |   \       |      /  |
-	//100|     |    --     V    --   |  <- Assumed parabola between three samples
-	//   |     |      \        /     |
-	//   |     |       ----0---      |      
-	//   |     | Integral  |   here  |
-	//   +-----+-----------+---------+------> (time (samples))
-	//         1           2         3
-	//
-	// That is some reall confusing ascii art. None the less.
-	// The bottom line is that the geometry gets really intense after this to calculate area.
-	// Unless you freakin love math, don't bother to do it yourself. Look it up on wikipedia instead!
-	//
-	// Turns out some chump named "Simpson" (Homer? maybe?) did the math already for you, and determined
-	// that the are under the curve is calculated by a handy formula:
-	//
-	// Integral = (time between sample 1 and 3)/6 * (sample_1 + 4*sample_2 + sample_3)
-	//
-	// The disadvantage here is that after each integral calculation, we need to wait for two new samples
-	// before we can do another integral calculation. This might slow down the reading. However, for our high sample rate
-	// we'll probably be fine.
-	// Addionally, Simpson's method assumes that the time between sample_1 and sample_2 is about the same as the time
-	// between sample_2 and sample_3. If this is not true, Simpson's method produces lots of error :(
-	//
-	// In this case, our integration is still a sum. Except here, it's a sum of small regions where
-	// one boundary happens to be a parabola.
-	//
-	// You can switch between these two implementations by choosing 1 or 0 for the below variable. 
-	// 1 (Simpson's method) seems to be more accurate, so I'd keep it there for now unless the reading
-	// lags too much.
-	//
 	private static final int integration_method = 1;
 	
 	//state for calculating simpsons method of numerical integration.
