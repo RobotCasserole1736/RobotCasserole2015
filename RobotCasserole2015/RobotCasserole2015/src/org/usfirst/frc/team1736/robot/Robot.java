@@ -2,10 +2,14 @@
 package org.usfirst.frc.team1736.robot;
 
 import edu.wpi.first.wpilibj.AnalogInput;
+import edu.wpi.first.wpilibj.CANJaguar;
+import edu.wpi.first.wpilibj.DigitalInput;
 import edu.wpi.first.wpilibj.Compressor;
 import edu.wpi.first.wpilibj.Gyro;
 import edu.wpi.first.wpilibj.IterativeRobot;
 import edu.wpi.first.wpilibj.Joystick;
+import edu.wpi.first.wpilibj.Solenoid;
+import edu.wpi.first.wpilibj.SpeedController;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.VictorSP;
 import edu.wpi.first.wpilibj.PIDSource.PIDSourceParameter;
@@ -27,6 +31,7 @@ public class Robot extends IterativeRobot {
 	
 	//-Component IDS
 	final static int JOY1_INT = 0;
+	final static int JOY2_INT = 0;
 	
 	final static int LEFTROBOT_FRONTMOTOR_ID = 0;
 	final static int LEFTROBOT_BACKMOTOR_ID = 1;
@@ -66,7 +71,24 @@ public class Robot extends IterativeRobot {
 //	final static double P = 0;
 //	final static double I = 0;
 //	final static double D = 0;
-//	
+
+	//-Elevator
+	final static int ELEVATOR_MOTOR_ID = 0;
+	final static double ELEVATOR_P = 0;
+	final static double ELEVATOR_I = 0;
+	final static double ELEVATOR_D = 0;
+	final static int ENCODER_A = 0;
+	final static int ENCODER_B = 0;
+	final static int BOTTOM_SENSOR_ID = 0;
+	final static int TOP_SENSOR_ID = 0;
+	final static double MIN_RETRACT_HEIGHT = .05;
+
+	//-Elevator Levels
+	final int LEVEL1 = 625;
+	final int LEVEL2 = 1250;
+	final int LEVEL3 = 1875;
+	final int LEVEL4 = 2500;
+
 	//-Gyro Values
     final static int GYRO_ID = 0;
     final static double GYRO_SENSITIVITY = 0.007;
@@ -84,6 +106,7 @@ public class Robot extends IterativeRobot {
 	//*Declaring robot parts*
 	//-Joystick
 	Joystick joy1;
+	Joystick joy2;
 	
 	//-DriveTrain Motors
 	VictorSP frontLeftMotor;
@@ -92,14 +115,21 @@ public class Robot extends IterativeRobot {
 	VictorSP backRightMotor;
 	VictorSP slideMotor;
 	
+	//-Compressor
+	Compressor compressor;
+	
+	//-Solenoids
+	Solenoid solenoidInOut;
+	Solenoid solenoidOpenClose;
+	
+	//-Elevator
+	Elevator elevator;
+	
 	//-DriveTrain
 	SlideTrain slideTrain;	
 	
 	//-Gyro
 	Gyro gyro;
-	
-	//-Compressor
-	Compressor compressor;
 	
 	AnalogInput pressureSensor;
 	
@@ -107,6 +137,7 @@ public class Robot extends IterativeRobot {
 
     	//Joystick
     	joy1 = new Joystick(JOY1_INT);
+    	joy2 = new Joystick(JOY2_INT);
     	//Motors
     	frontLeftMotor = new VictorSP(LEFTROBOT_FRONTMOTOR_ID);
     	backLeftMotor = new VictorSP(LEFTROBOT_BACKMOTOR_ID);
@@ -123,8 +154,12 @@ public class Robot extends IterativeRobot {
     	slideTrain.enable();
     	//Compressor
 		compressor = new Compressor();
+		compressor.start();
 		pressureSensor = new AnalogInput(PRESSURE_SENSOR_ID);
-		
+		//Elevator
+		solenoidInOut = new Solenoid(0);
+    	solenoidOpenClose = new Solenoid(1);
+    	elevator = new Elevator(ELEVATOR_MOTOR_ID, ELEVATOR_P, ELEVATOR_I, ELEVATOR_D, ENCODER_A, ENCODER_B, BOTTOM_SENSOR_ID, TOP_SENSOR_ID);
 		SmartDashboard.putNumber("Autonomous Mode:", autonomousMode);
     }
 
@@ -179,6 +214,18 @@ public class Robot extends IterativeRobot {
     		slideTrain.arcadeDrive((-1 *joy1.getRawAxis(XBOX_LSTICK_YAXIS)), joy1.getRawAxis(XBOX_RSTICK_XAXIS), joy1.getRawAxis(XBOX_LSTICK_XAXIS), slideTune, true);
     	if(!slideTrain.getPIDController().isEnable())
     		gyro.reset();
+    		
+    	if(joy2.getRawButton(1)){
+    		solenoidInOut.set(true);
+    	}else if(joy2.getRawButton(2) && elevator.returnPIDInput() > MIN_RETRACT_HEIGHT){
+    		solenoidInOut.set(false);
+    	}
+    	if(joy2.getRawButton(3)){
+    		solenoidOpenClose.set(true);
+    	}else if(joy2.getRawButton(4)){
+    		solenoidOpenClose.set(false);
+    	}
+    		
         
     	//Set motor values. Note right motor values are inverted due to the physical
     	//configuration of the robot drivetrain
