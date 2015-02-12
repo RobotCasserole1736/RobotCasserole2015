@@ -14,7 +14,7 @@ public class Elevator extends PIDSubsystem
 	DigitalInput bottomSensor, topSensor;
 	
 	final int MAX_DISTANCE = 1000;
-	final double DISTANCE_PER_PULSE = 1/360;
+	final double DISTANCE_PER_PULSE = 1/360 * 12/34;
 	final double MAX_PERIOD = 0.1;
 	final double MIN_RATE = 10;
 	final boolean REVERSE_DIRECTION = true;

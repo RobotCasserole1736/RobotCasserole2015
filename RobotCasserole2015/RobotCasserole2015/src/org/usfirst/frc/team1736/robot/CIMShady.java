@@ -1,6 +1,8 @@
 
 package org.usfirst.frc.team1736.robot;
 
+import java.util.TreeMap;
+
 import edu.wpi.first.wpilibj.AnalogInput;
 import edu.wpi.first.wpilibj.CANJaguar;
 import edu.wpi.first.wpilibj.DigitalInput;
@@ -22,7 +24,7 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
  * creating this project, you must also update the manifest file in the resource
  * directory.
  */
-public class Robot extends IterativeRobot {
+public class CIMShady extends IterativeRobot {
     /**
      * This function is run when the robot is first started up and should be
      * used for any initialization code.
@@ -83,12 +85,6 @@ public class Robot extends IterativeRobot {
 	final static int TOP_SENSOR_ID = 0;
 	final static double MIN_RETRACT_HEIGHT = .05;
 
-	//-Elevator Levels
-	final int LEVEL1 = 625;
-	final int LEVEL2 = 1250;
-	final int LEVEL3 = 1875;
-	final int LEVEL4 = 2500;
-
 	//-Gyro Values
     final static int GYRO_ID = 0;
     final static double GYRO_SENSITIVITY = 0.007;
@@ -131,6 +127,10 @@ public class Robot extends IterativeRobot {
 	//-Gyro
 	Gyro gyro;
 	
+	//-Treemap for Elevator Levels
+	TreeMap<Integer, Integer> levels;
+	Integer currentLevel = 0;
+	
 	AnalogInput pressureSensor;
 	
     public void robotInit() {
@@ -138,29 +138,44 @@ public class Robot extends IterativeRobot {
     	//Joystick
     	joy1 = new Joystick(JOY1_INT);
     	joy2 = new Joystick(JOY2_INT);
+    	
     	//Motors
     	frontLeftMotor = new VictorSP(LEFTROBOT_FRONTMOTOR_ID);
     	backLeftMotor = new VictorSP(LEFTROBOT_BACKMOTOR_ID);
     	frontRightMotor = new VictorSP(RIGHTROBOT_FRONTMOTOR_ID);
     	backRightMotor = new VictorSP(RIGHTROBOT_BACKMOTOR_ID);
     	slideMotor = new VictorSP(SLIDE_MOTOR_ID);
+    	
     	//Gyro
     	gyro = new Gyro(GYRO_ID);
 		gyro.initGyro();
 		gyro.setPIDSourceParameter(PIDSourceParameter.kAngle);
 		gyro.setSensitivity(GYRO_SENSITIVITY);
+		
     	//Drive Train
     	slideTrain = new SlideTrain(frontLeftMotor, backLeftMotor, frontRightMotor, backRightMotor, slideMotor, gyro, P, I, D);
     	slideTrain.enable();
+    	
     	//Compressor
 		compressor = new Compressor();
 		compressor.start();
 		pressureSensor = new AnalogInput(PRESSURE_SENSOR_ID);
+		
 		//Elevator
 		solenoidInOut = new Solenoid(0);
     	solenoidOpenClose = new Solenoid(1);
     	elevator = new Elevator(ELEVATOR_MOTOR_ID, ELEVATOR_P, ELEVATOR_I, ELEVATOR_D, ENCODER_A, ENCODER_B, BOTTOM_SENSOR_ID, TOP_SENSOR_ID);
-		SmartDashboard.putNumber("Autonomous Mode:", autonomousMode);
+		
+    	levels = new TreeMap<Integer, Integer>();
+    	levels.put(0, 0);
+    	levels.put(1, 625);
+    	levels.put(2, 1250);
+    	levels.put(3, 1875);
+    	levels.put(4, 2500);
+    	
+    	
+    	
+    	SmartDashboard.putNumber("Autonomous Mode:", autonomousMode);
     }
 
     public void autonomousInit() {
@@ -215,14 +230,20 @@ public class Robot extends IterativeRobot {
     	if(!slideTrain.getPIDController().isEnable())
     		gyro.reset();
     		
-    	if(joy2.getRawButton(1)){
+    	if(joy2.getRawButton(1))
+    	{
     		solenoidInOut.set(true);
-    	}else if(joy2.getRawButton(2) && elevator.returnPIDInput() > MIN_RETRACT_HEIGHT){
+    	}
+    	else if(joy2.getRawButton(2) && elevator.returnPIDInput() > MIN_RETRACT_HEIGHT)
+    	{
     		solenoidInOut.set(false);
     	}
-    	if(joy2.getRawButton(3)){
+    	if(joy2.getRawButton(3))
+    	{
     		solenoidOpenClose.set(true);
-    	}else if(joy2.getRawButton(4)){
+    	}
+    	else if(joy2.getRawButton(4))
+    	{
     		solenoidOpenClose.set(false);
     	}
     		
