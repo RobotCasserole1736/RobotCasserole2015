@@ -84,10 +84,12 @@ public class CIMShady extends IterativeRobot {
 	final static int BOTTOM_SENSOR_ID = 0;
 	final static int TOP_SENSOR_ID = 0;
 	final static double MIN_RETRACT_HEIGHT = .05;
+	
+	boolean Elev_PID = true;
 
-	//-Gyro Values
-    final static int GYRO_ID = 0;
-    final static double GYRO_SENSITIVITY = 0.007;
+//	//-Gyro Values
+//    final static int GYRO_ID = 0;
+//    final static double GYRO_SENSITIVITY = 0.007;
     double gyroValue;
     
     //-Compressor IDs
@@ -124,14 +126,18 @@ public class CIMShady extends IterativeRobot {
 	//-DriveTrain
 	SlideTrain slideTrain;	
 	
-	//-Gyro
-	Gyro gyro;
+//	//-Gyro
+//	Gyro gyro;
+	I2CGyro gyro;
 	
 	//-Treemap for Elevator Levels
-	TreeMap<Integer, Integer> levels;
+//	TreeMap<Integer, Double> levels;
+	//0 is starting level
 	Integer currentLevel = 0;
 	
 	AnalogInput pressureSensor;
+	
+	int[] levels;
 	
     public void robotInit() {
 
@@ -146,11 +152,11 @@ public class CIMShady extends IterativeRobot {
     	backRightMotor = new VictorSP(RIGHTROBOT_BACKMOTOR_ID);
     	slideMotor = new VictorSP(SLIDE_MOTOR_ID);
     	
-    	//Gyro
-    	gyro = new Gyro(GYRO_ID);
-		gyro.initGyro();
-		gyro.setPIDSourceParameter(PIDSourceParameter.kAngle);
-		gyro.setSensitivity(GYRO_SENSITIVITY);
+//    	//Gyro
+//    	gyro = new Gyro(GYRO_ID);
+//		gyro.initGyro();
+//		gyro.setPIDSourceParameter(PIDSourceParameter.kAngle);
+//		gyro.setSensitivity(GYRO_SENSITIVITY);
 		
     	//Drive Train
     	slideTrain = new SlideTrain(frontLeftMotor, backLeftMotor, frontRightMotor, backRightMotor, slideMotor, gyro, P, I, D);
@@ -166,14 +172,19 @@ public class CIMShady extends IterativeRobot {
     	solenoidOpenClose = new Solenoid(1);
     	elevator = new Elevator(ELEVATOR_MOTOR_ID, ELEVATOR_P, ELEVATOR_I, ELEVATOR_D, ENCODER_A, ENCODER_B, BOTTOM_SENSOR_ID, TOP_SENSOR_ID);
 		
-    	levels = new TreeMap<Integer, Integer>();
-    	levels.put(0, 0);
-    	levels.put(1, 625);
-    	levels.put(2, 1250);
-    	levels.put(3, 1875);
-    	levels.put(4, 2500);
+//    	levels = new TreeMap<Integer, Double>();
+//    	levels.put(0, (double) 0);
+//    	levels.put(1, (double) 625);
+//    	levels.put(2, (double) 1250);
+//    	levels.put(3, (double) 1875);
+//    	levels.put(4, (double) 2500);
     	
-    	
+    	levels = new int[5];
+    	levels[0] = 0;
+    	levels[1] = 625;
+    	levels[2] = 1250;
+    	levels[3] = 1875;
+    	levels[4] = 2500;
     	
     	SmartDashboard.putNumber("Autonomous Mode:", autonomousMode);
     }
@@ -218,8 +229,8 @@ public class CIMShady extends IterativeRobot {
     public void teleopPeriodic() {
     	
     	//acquire gyroscope value, convert to radians, wrap to proper range
-    	gyroValue = (gyro.getAngle()*(Math.PI/180)) % (2*Math.PI);
-    	if(gyro.getAngle() < 0)
+    	gyroValue = (gyro.get_gyro_angle()*(Math.PI/180)) % (2*Math.PI);
+    	if(gyro.get_gyro_angle() < 0)
     		gyroValue += 2*Math.PI;
     	
     	//Run either open- or closed-loop control, depending on what is requested
@@ -228,7 +239,7 @@ public class CIMShady extends IterativeRobot {
     	else
     		slideTrain.arcadeDrive((-1 *joy1.getRawAxis(XBOX_LSTICK_YAXIS)), joy1.getRawAxis(XBOX_RSTICK_XAXIS), joy1.getRawAxis(XBOX_LSTICK_XAXIS), slideTune, true);
     	if(!slideTrain.getPIDController().isEnable())
-    		gyro.reset();
+    		gyro.reset_gyro_angle();
     		
     	if(joy2.getRawButton(1))
     	{
@@ -245,6 +256,40 @@ public class CIMShady extends IterativeRobot {
     	else if(joy2.getRawButton(4))
     	{
     		solenoidOpenClose.set(false);
+    	}
+    	
+    	if(joy2.getRawButton(XBOX_RIGHT_BUTTON) && currentLevel >= 0 && Elev_PID)
+    	{
+    		elevator.setSetpoint(levels[currentLevel + 1]);
+    		if(currentLevel > 0)
+    		{
+    			currentLevel = currentLevel + 1;
+    		}
+    	}
+    	else if(joy2.getRawButton(XBOX_LEFT_BUTTON) && currentLevel >= 0)
+    	{
+    		elevator.setSetpoint(levels[currentLevel - 1]);
+    		if(currentLevel > 0)
+    		{
+    			currentLevel = currentLevel - 1;
+    		}
+    	}
+    	else if(joy2.getRawButton(XBOX_SELECT_BUTTON) && joy2.getRawButton(XBOX_START_BUTTON))
+    	{
+    		elevator.disable();
+    		Elev_PID = false;
+    	}
+    	else if(joy2.getRawButton(XBOX_RIGHT_BUTTON) && !Elev_PID)
+    	{
+    		elevator.setMotorSpeed(0.5);
+    	}
+    	else if(joy2.getRawButton(XBOX_LEFT_BUTTON) && !Elev_PID)
+    	{
+    		elevator.setMotorSpeed(-0.5);
+    	}
+    	else if(!Elev_PID)
+    	{
+    		elevator.setMotorSpeed(0);
     	}
     		
         

@@ -14,7 +14,7 @@ public class SlideTrain extends PIDSubsystem{
     protected SpeedController backLeftMotor;
     protected SpeedController backRightMotor;
     protected SpeedController slideMotor;
-    protected Gyro gyro = null;
+    protected I2CGyro gyro = null;
     
     protected Encoder leftEncoder;
     protected Encoder rightEncoder;
@@ -55,7 +55,7 @@ public class SlideTrain extends PIDSubsystem{
     static double lastTime = 0;
 	
 	public SlideTrain(SpeedController leftFrontMotor, SpeedController leftBackMotor, SpeedController rightFrontMotor, 
-					  SpeedController rightBackMotor, SpeedController slideMotor, Gyro gyro, double P, double I, double D)
+					  SpeedController rightBackMotor, SpeedController slideMotor, I2CGyro gyro, double P, double I, double D)
 	{
 		super("SlideTrain",P,I,D);
 		this.frontLeftMotor = leftFrontMotor;
@@ -293,8 +293,8 @@ public class SlideTrain extends PIDSubsystem{
     
     public double getGyroValue()
     {
-    	double gyroValue = (gyro.getAngle()*(Math.PI/180)) % (2*Math.PI);
-    	if(gyro.getAngle() < 0)
+    	double gyroValue = (gyro.get_gyro_angle()*(Math.PI/180)) % (2*Math.PI);
+    	if(gyro.get_gyro_angle() < 0)
     	{
     		gyroValue += 2*Math.PI;
     	}

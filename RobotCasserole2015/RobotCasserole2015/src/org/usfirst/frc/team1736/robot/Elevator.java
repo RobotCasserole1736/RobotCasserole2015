@@ -78,4 +78,9 @@ public class Elevator extends PIDSubsystem
 		final double Tote3Height = 3.0;
 	}
 	
+	protected void setMotorSpeed(double speed)
+	{
+		motor.set(speed);
+	}
+	
 }
