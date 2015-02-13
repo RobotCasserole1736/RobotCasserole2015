@@ -117,7 +117,8 @@ public class CIMShady extends IterativeRobot {
 	Compressor compressor;
 	
 	//-Solenoids
-	Solenoid solenoidInOut;
+	Solenoid solenoidIn;
+	Solenoid solenoidOut;
 	Solenoid solenoidOpenClose;
 	
 	//-Elevator
@@ -171,7 +172,8 @@ public class CIMShady extends IterativeRobot {
 		pressureSensor = new AnalogInput(PRESSURE_SENSOR_ID);
 		
 		//Elevator
-		solenoidInOut = new Solenoid(0);
+		solenoidIn = new Solenoid(0);
+		solenoidOut = new Solenoid(2);
     	solenoidOpenClose = new Solenoid(1);
     	elevator = new Elevator(ELEVATOR_MOTOR_ID, ELEVATOR_P, ELEVATOR_I, ELEVATOR_D, ENCODER_A, ENCODER_B, BOTTOM_SENSOR_ID, TOP_SENSOR_ID);
 		elevator.enable();
@@ -227,6 +229,8 @@ public class CIMShady extends IterativeRobot {
     public void teleopInit() {
     	
     	slideTrain.lastTime = Timer.getFPGATimestamp();
+    	solenoidIn.set(false);
+    	solenoidOut.set(false);
     	
     }
     
@@ -252,11 +256,13 @@ public class CIMShady extends IterativeRobot {
     		
     	if(joy2.getRawButton(1))
     	{
-    		solenoidInOut.set(true);
+    		solenoidIn.set(true);
+    		solenoidOut.set(false);
     	}
     	else if(joy2.getRawButton(2) && elevator.returnPIDInput() > MIN_RETRACT_HEIGHT)
     	{
-    		solenoidInOut.set(false);
+    		solenoidIn.set(false);
+    		solenoidOut.set(true);
     	}
     	if(joy2.getRawButton(3))
     	{
