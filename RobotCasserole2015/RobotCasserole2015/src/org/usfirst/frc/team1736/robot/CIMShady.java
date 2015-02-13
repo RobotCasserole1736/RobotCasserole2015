@@ -130,6 +130,9 @@ public class CIMShady extends IterativeRobot {
 //	Gyro gyro;
 	I2CGyro gyro;
 	
+	//-Lidar
+	LIDAR lidar;
+	
 	//-Treemap for Elevator Levels
 //	TreeMap<Integer, Double> levels;
 	//0 is starting level
@@ -171,13 +174,17 @@ public class CIMShady extends IterativeRobot {
 		solenoidInOut = new Solenoid(0);
     	solenoidOpenClose = new Solenoid(1);
     	elevator = new Elevator(ELEVATOR_MOTOR_ID, ELEVATOR_P, ELEVATOR_I, ELEVATOR_D, ENCODER_A, ENCODER_B, BOTTOM_SENSOR_ID, TOP_SENSOR_ID);
-		
+		elevator.enable();
+    	
 //    	levels = new TreeMap<Integer, Double>();
 //    	levels.put(0, (double) 0);
 //    	levels.put(1, (double) 625);
 //    	levels.put(2, (double) 1250);
 //    	levels.put(3, (double) 1875);
 //    	levels.put(4, (double) 2500);
+    	
+    	lidar = new LIDAR();
+    	lidar.start();
     	
     	levels = new int[5];
     	levels[0] = 0;
@@ -227,6 +234,8 @@ public class CIMShady extends IterativeRobot {
      * This function is called periodically during operator control
      */
     public void teleopPeriodic() {
+    	
+    	System.out.println("Lidar = " + lidar.getDistanceIn());
     	
     	//acquire gyroscope value, convert to radians, wrap to proper range
     	gyroValue = (gyro.get_gyro_angle()*(Math.PI/180)) % (2*Math.PI);
