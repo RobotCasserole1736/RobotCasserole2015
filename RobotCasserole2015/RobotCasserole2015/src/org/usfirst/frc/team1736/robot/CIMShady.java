@@ -33,7 +33,7 @@ public class CIMShady extends IterativeRobot {
 	
 	//-Component IDS
 	final static int JOY1_INT = 0;
-	final static int JOY2_INT = 0;
+	final static int JOY2_INT = 1;
 	
 	final static int LEFTROBOT_FRONTMOTOR_ID = 0;
 	final static int LEFTROBOT_BACKMOTOR_ID = 1;
@@ -65,9 +65,9 @@ public class CIMShady extends IterativeRobot {
 	final static double slideTune = .4;
 	
 	//PID Values
-	final static double P = .60;
-	final static double I = .075;
-	final static double D = 2;
+	final static double P = 1.3;
+	final static double I = 0.01;
+	final static double D = 2.0;
 //	
 //	//PID Values
 //	final static double P = 0;
@@ -75,15 +75,15 @@ public class CIMShady extends IterativeRobot {
 //	final static double D = 0;
 
 	//-Elevator
-	final static int ELEVATOR_MOTOR_ID = 0;
-	final static double ELEVATOR_P = 0;
+	final static int ELEVATOR_MOTOR_ID = 1;
+	final static double ELEVATOR_P = 1;
 	final static double ELEVATOR_I = 0;
 	final static double ELEVATOR_D = 0;
 	final static int ENCODER_A = 0;
-	final static int ENCODER_B = 0;
-	final static int BOTTOM_SENSOR_ID = 0;
-	final static int TOP_SENSOR_ID = 0;
-	final static double MIN_RETRACT_HEIGHT = .05;
+	final static int ENCODER_B = 1;
+	final static int BOTTOM_SENSOR_ID = 14;
+	final static int TOP_SENSOR_ID = 12;
+	final static double MIN_RETRACT_HEIGHT = -1;
 	
 	boolean Elev_PID = true;
 
@@ -100,6 +100,10 @@ public class CIMShady extends IterativeRobot {
 	
     //-Autonomous mode
     int autonomousMode = 0;
+    
+    //LRButton Debounce
+    boolean lastL_ButtonValue = false;
+    boolean lastR_ButtonValue = false;
     
 	//*Declaring robot parts*
 	//-Joystick
@@ -161,20 +165,24 @@ public class CIMShady extends IterativeRobot {
 //		gyro.initGyro();
 //		gyro.setPIDSourceParameter(PIDSourceParameter.kAngle);
 //		gyro.setSensitivity(GYRO_SENSITIVITY);
+		//Gyro
+		gyro = new I2CGyro();
 		
     	//Drive Train
     	slideTrain = new SlideTrain(frontLeftMotor, backLeftMotor, frontRightMotor, backRightMotor, slideMotor, gyro, P, I, D);
     	slideTrain.enable();
     	
     	//Compressor
-		compressor = new Compressor();
+		compressor = new Compressor(2);
+		compressor.clearAllPCMStickyFaults();
+		compressor.setClosedLoopControl(true);
 		compressor.start();
 		pressureSensor = new AnalogInput(PRESSURE_SENSOR_ID);
 		
 		//Elevator
-		solenoidIn = new Solenoid(0);
-		solenoidOut = new Solenoid(2);
-    	solenoidOpenClose = new Solenoid(1);
+		solenoidIn = new Solenoid(2, 1);
+		solenoidOut = new Solenoid(2, 2);
+    	solenoidOpenClose = new Solenoid(2, 0);
     	elevator = new Elevator(ELEVATOR_MOTOR_ID, ELEVATOR_P, ELEVATOR_I, ELEVATOR_D, ENCODER_A, ENCODER_B, BOTTOM_SENSOR_ID, TOP_SENSOR_ID);
 		elevator.enable();
     	
@@ -202,6 +210,7 @@ public class CIMShady extends IterativeRobot {
     	
     	SmartDashboard.getNumber("Autonomous Mode:");
     	slideTrain.lastTime = Timer.getFPGATimestamp();
+    	slideTrain.zeroAngle();
     	
     }
     
@@ -231,6 +240,7 @@ public class CIMShady extends IterativeRobot {
     	slideTrain.lastTime = Timer.getFPGATimestamp();
     	solenoidIn.set(false);
     	solenoidOut.set(false);
+    	slideTrain.zeroAngle();
     	
     }
     
@@ -254,53 +264,54 @@ public class CIMShady extends IterativeRobot {
     	if(!slideTrain.getPIDController().isEnable())
     		gyro.reset_gyro_angle();
     		
-    	if(joy2.getRawButton(1))
+    	if(joy1.getRawButton(1))
     	{
     		solenoidIn.set(true);
     		solenoidOut.set(false);
     	}
-    	else if(joy2.getRawButton(2) && elevator.returnPIDInput() > MIN_RETRACT_HEIGHT)
+    	else if(joy1.getRawButton(2) && elevator.returnPIDInput() > MIN_RETRACT_HEIGHT && !solenoidOpenClose.get())
     	{
     		solenoidIn.set(false);
     		solenoidOut.set(true);
     	}
-    	if(joy2.getRawButton(3))
+    	if(joy1.getRawButton(3))
     	{
     		solenoidOpenClose.set(true);
     	}
-    	else if(joy2.getRawButton(4))
+    	else if(joy1.getRawButton(4))
     	{
     		solenoidOpenClose.set(false);
     	}
     	
-    	if(joy2.getRawButton(XBOX_RIGHT_BUTTON) && currentLevel >= 0 && Elev_PID)
-    	{
-    		elevator.setSetpoint(levels[currentLevel + 1]);
-    		if(currentLevel > 0)
-    		{
-    			currentLevel = currentLevel + 1;
-    		}
-    	}
-    	else if(joy2.getRawButton(XBOX_LEFT_BUTTON) && currentLevel >= 0)
-    	{
-    		elevator.setSetpoint(levels[currentLevel - 1]);
-    		if(currentLevel > 0)
-    		{
-    			currentLevel = currentLevel - 1;
-    		}
-    	}
-    	else if(joy2.getRawButton(XBOX_SELECT_BUTTON) && joy2.getRawButton(XBOX_START_BUTTON))
+//    	if(joy1.getRawButton(XBOX_RIGHT_BUTTON) && !lastR_ButtonValue && currentLevel >= 0 && Elev_PID)
+//    	{
+//    		elevator.setSetpoint(levels[currentLevel + 1]);
+//    		if(currentLevel > 0)
+//    		{
+//    			currentLevel = currentLevel + 1;
+//    		}
+//    	}
+//    	else if(joy1.getRawButton(XBOX_LEFT_BUTTON) && !lastL_ButtonValue && currentLevel >= 0)
+//    	{
+//    		elevator.setSetpoint(levels[currentLevel - 1]);
+//    		if(currentLevel > 0)
+//    		{
+//    			currentLevel = currentLevel - 1;
+//    		}
+//    	}
+//    	else
+    	if(joy1.getRawButton(XBOX_SELECT_BUTTON) && joy1.getRawButton(XBOX_START_BUTTON))
     	{
     		elevator.disable();
     		Elev_PID = false;
     	}
-    	else if(joy2.getRawButton(XBOX_RIGHT_BUTTON) && !Elev_PID)
+    	else if(joy1.getRawButton(XBOX_RIGHT_BUTTON) && !Elev_PID)
     	{
-    		elevator.setMotorSpeed(0.5);
+    		elevator.setMotorSpeed(0.55);
     	}
-    	else if(joy2.getRawButton(XBOX_LEFT_BUTTON) && !Elev_PID)
+    	else if(joy1.getRawButton(XBOX_LEFT_BUTTON) && !Elev_PID)
     	{
-    		elevator.setMotorSpeed(-0.5);
+    		elevator.setMotorSpeed(-0.55);
     	}
     	else if(!Elev_PID)
     	{
@@ -315,6 +326,9 @@ public class CIMShady extends IterativeRobot {
 		backRightMotor.set(-slideTrain.backRightMotorValue);
 		backLeftMotor.set(slideTrain.backLeftMotorValue);
 		slideMotor.set(slideTrain.slideMotorValue);
+		
+		lastR_ButtonValue = joy1.getRawButton(XBOX_RIGHT_BUTTON);
+		lastL_ButtonValue = joy1.getRawButton(XBOX_LEFT_BUTTON);
 		
 		//Spit some debug info out to the Riolog
 //		System.out.print("Front Right Motor: " + String.format( "%.2f", slideTrain.frontRightMotorValue) + " ");

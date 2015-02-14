@@ -19,11 +19,11 @@ public class SlideTrain extends PIDSubsystem{
     protected Encoder leftEncoder;
     protected Encoder rightEncoder;
     
-    final static int leftEncoderID = 0;
-    final static int leftEncoderID_2 = 1;
+    final static int leftEncoderID = 2;
+    final static int leftEncoderID_2 = 3;
     
-    final static int rightEncoderID = 2;
-    final static int rightEncoderID_2 = 3;
+    final static int rightEncoderID = 4;
+    final static int rightEncoderID_2 = 5;
     
 	double frontLeftMotorValue;
 	double frontRightMotorValue;
@@ -322,6 +322,14 @@ public class SlideTrain extends PIDSubsystem{
 	protected void initDefaultCommand() {
 		// TODO Auto-generated method stub
 		
+	}
+	
+	public void zeroAngle()
+	{
+		setPoint = gyro.get_gyro_angle();
+		setSetpoint(Math.toRadians(setPoint));
+		getPIDController().reset();
+		getPIDController().enable();
 	}
 	
 }

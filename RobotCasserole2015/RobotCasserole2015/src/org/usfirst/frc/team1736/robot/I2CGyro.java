@@ -4,7 +4,7 @@
 //
 // CLASS NAME: I2CGyro
 // DESCRIPTION: I2C Gyro class - driver for L3G4200D MEMS Gyro
-// 				Includes filtering and descrete integral for angle calculation.
+// 				Includes filtering and discrete integral for angle calculation.
 //
 // NOTES: Multithreaded support. Initializing the gyro kicks off a periodic
 //        read function which asynchronously reads from they gyro in the

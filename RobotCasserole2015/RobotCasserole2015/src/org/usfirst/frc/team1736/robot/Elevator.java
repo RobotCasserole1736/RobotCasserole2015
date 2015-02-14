@@ -1,5 +1,6 @@
 package org.usfirst.frc.team1736.robot;
 
+import edu.wpi.first.wpilibj.CANTalon;
 import edu.wpi.first.wpilibj.CounterBase.EncodingType;
 import edu.wpi.first.wpilibj.DigitalInput;
 import edu.wpi.first.wpilibj.Encoder;
@@ -9,7 +10,7 @@ import edu.wpi.first.wpilibj.command.PIDSubsystem;
 
 public class Elevator extends PIDSubsystem
 {
-	TalonSRX motor;
+	CANTalon motor;
 	Encoder encoder;
 	DigitalInput bottomSensor, topSensor;
 	
@@ -25,8 +26,7 @@ public class Elevator extends PIDSubsystem
 	public Elevator(int motorID, double p, double i, double d, int EncoderA, int EncoderB, int bottomSensor, int topSensor)
 	{
 		super("Elevator", p, i, d);
-		
-		motor = new TalonSRX(motorID);
+		motor = new CANTalon(motorID);
 		encoder = new Encoder(EncoderA, EncoderB, true, EncodingType.k4X);
 		encoder.setDistancePerPulse(DISTANCE_PER_PULSE);
 		encoder.setMaxPeriod(MAX_PERIOD);
@@ -49,18 +49,18 @@ public class Elevator extends PIDSubsystem
 	@Override
 	protected void usePIDOutput(double output) 
 	{
-		if((output > 0 && topSensor.get()) || (output < 0 && bottomSensor.get()))
-			motor.set(0);
-		else
-			motor.set(output);
-		
-		if(bottomSensor.get() && !lastState)
-		{
-			getPIDController().reset();
-			getPIDController().enable();
-			encoder.reset();
-		}
-		lastState = bottomSensor.get();
+//		if((output > 0 && topSensor.get()) || (output < 0 && bottomSensor.get()))
+//			motor.set(0);
+//		else
+//			motor.set(output);
+//		
+//		if(bottomSensor.get() && !lastState)
+//		{
+//			getPIDController().reset();
+//			getPIDController().enable();
+//			encoder.reset();
+//		}
+//		lastState = bottomSensor.get();
 	}
 
 	@Override
