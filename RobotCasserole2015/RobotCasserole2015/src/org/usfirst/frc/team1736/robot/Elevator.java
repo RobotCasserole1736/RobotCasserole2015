@@ -23,6 +23,7 @@ public class Elevator extends PIDSubsystem
 	final double MIN_RATE = 10;
 	final boolean REVERSE_DIRECTION = true;
 	final double ENCODER_PULSES_PER_IN = 1132.0;
+	final double MAX_HEIGHT = 42.7;
 	//double startHeight = 8; //change
 	double raw_encoder_bottom_offset = 0; //Must reset to encoderRaw every time the elevator bottoms out.
 	boolean encoder_is_calibrated = false; // set to true once the bottom has been hit at least once.
@@ -63,7 +64,7 @@ public class Elevator extends PIDSubsystem
 	@Override
 	protected void usePIDOutput(double output) 
 	{
-		if((output > 0 && topSensor.get()) || (output < 0 && bottomSensor.get()))
+		if((output > 0 && getElevatorHeightIN() >=  MAX_HEIGHT) || (output < 0 && bottomSensor.get()))
 		{
 			motor.set(0);
 			elevatorOutput = 0;

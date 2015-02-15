@@ -34,7 +34,7 @@ public class CIMShady extends IterativeRobot {
 	//-Component IDS
 	final static int JOY1_INT = 0;
 	final static int JOY2_INT = 1;
-	final static boolean SINGLE_JOYSTICK_IS_BEST_JOYSTICK = false;
+	final static boolean SINGLE_JOYSTICK_IS_BEST_JOYSTICK = true;
 	
 	final static int LEFTROBOT_FRONTMOTOR_ID = 0;
 	final static int LEFTROBOT_BACKMOTOR_ID = 1;
@@ -156,7 +156,7 @@ public class CIMShady extends IterativeRobot {
 	
 	AnalogInput pressureSensor;
 	
-	double[] levels = {0, 8, 16, 24, 32, 40, 45};
+	double[] levels = {0, 8, 16, 24, 32, 40, 42.5};
 	//Low sensor is about 6 inches, high is about 43 inches
 	
     public void robotInit() {
@@ -189,7 +189,7 @@ public class CIMShady extends IterativeRobot {
     	
     	//Compressor
 		compressor = new Compressor(2);
-		compressor.clearAllPCMStickyFaults();
+		//compressor.clearAllPCMStickyFaults();
 		compressor.setClosedLoopControl(true);
 		compressor.start();
 		pressureSensor = new AnalogInput(PRESSURE_SENSOR_ID);
@@ -231,6 +231,14 @@ public class CIMShady extends IterativeRobot {
 
     	switch(autonomousMode)
     	{
+    	case 0:
+    		slideTrain.driveStraight(458);
+    		frontRightMotor.set(-slideTrain.frontRightMotorValue);
+    		frontLeftMotor.set(slideTrain.frontLeftMotorValue);
+    		backRightMotor.set(-slideTrain.backRightMotorValue);
+    		backLeftMotor.set(slideTrain.backLeftMotorValue);
+    		slideMotor.set(slideTrain.slideMotorValue);
+    		break;
     	case 1:
     		
     		break;

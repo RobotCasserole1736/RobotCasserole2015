@@ -67,6 +67,7 @@ public class SlideTrain extends PIDSubsystem{
 		
 		leftEncoder = new Encoder(leftEncoderID, leftEncoderID_2);
 		rightEncoder = new Encoder(rightEncoderID, rightEncoderID_2);
+		rightEncoder.setReverseDirection(true);
 		
 		//PID Subsystem stuff
 		getPIDController().setContinuous(true); //Allow the PID algorithm to correct for error by traversing through the 360<->0 degrees.
@@ -264,18 +265,18 @@ public class SlideTrain extends PIDSubsystem{
 
     public void driveStraight(double distance)
     {
-    	if(leftEncoder.getDistance() < (distance / 2) || rightEncoder.getDistance() < (distance / 2))
-    	{
-    		PIDarcadeDrive(0, 1, 0, false);
-    	}
-    	else if((leftEncoder.getDistance() < ((3/4) * distance)) || (rightEncoder.getDistance() < ((3/4) * distance))) 
-    	
-    	{
-    		PIDarcadeDrive(0, 0.5, 0, false);
-    	}
-    	else if(((leftEncoder.getDistance() >= distance) || (rightEncoder.getDistance() >= distance)))
+    	if(((leftEncoder.getDistance() >= distance) || (rightEncoder.getDistance() >= distance)))
     	{
     		PIDarcadeDrive(0, 0, 0, false);
+    	}
+    	else if((leftEncoder.getDistance() > ((3/4) * distance)) || (rightEncoder.getDistance() > ((3/4) * distance))) 
+    	
+    	{
+    		PIDarcadeDrive(0, 0.4, 0, false);
+    	}
+    	else // if(leftEncoder.getDistance() < (distance / 2) || rightEncoder.getDistance() > (distance / 2))
+    	{
+    		PIDarcadeDrive(0, .7, 0, false);
     	}
     }
     
