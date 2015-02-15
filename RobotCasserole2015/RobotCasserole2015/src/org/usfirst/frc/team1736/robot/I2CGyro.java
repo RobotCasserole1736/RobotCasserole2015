@@ -107,7 +107,7 @@ public class I2CGyro {
 	private final short gyro_max_limit = 0x7FB0; //directly in bits, same scale as gyro's registers
 	
 	//Deadzone 
-	public static final double gyro_deadzone = 0.1; //(in deg/sec)
+	public static final double gyro_deadzone = 0.01; //(in deg/sec)
 	
 	//Conversion factor from bits to degrees per sec
 	private static final double degPerSecPerLSB = 0.07;
