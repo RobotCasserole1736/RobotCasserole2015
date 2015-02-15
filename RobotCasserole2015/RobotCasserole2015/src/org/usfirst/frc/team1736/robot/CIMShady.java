@@ -34,6 +34,7 @@ public class CIMShady extends IterativeRobot {
 	//-Component IDS
 	final static int JOY1_INT = 0;
 	final static int JOY2_INT = 1;
+	final static boolean SINGLE_JOYSTICK_IS_BEST_JOYSTICK = false;
 	
 	final static int LEFTROBOT_FRONTMOTOR_ID = 0;
 	final static int LEFTROBOT_BACKMOTOR_ID = 1;
@@ -66,7 +67,7 @@ public class CIMShady extends IterativeRobot {
 	
 	//PID Values
 	final static double P = 1.3;
-	final static double I = 0.01;
+	final static double I = 0;//0.01;
 	final static double D = 2.0;
 //	
 //	//PID Values
@@ -83,9 +84,13 @@ public class CIMShady extends IterativeRobot {
 	final static int ENCODER_B = 1;
 	final static int BOTTOM_SENSOR_ID = 14;
 	final static int TOP_SENSOR_ID = 12;
-	final static double MIN_RETRACT_HEIGHT = -1;
+	final static int MIDDLE_SENSOR_ID = 13;
+	final static double MIN_RETRACTED_LEVEL = 1;
+	final static int LEFT_DISTANCE_ID = 6;
+	final static int RIGHT_DISTANCE_ID = 7;
 	
 	boolean Elev_PID = true;
+	boolean goDown = false;
 
 //	//-Gyro Values
 //    final static int GYRO_ID = 0;
@@ -104,6 +109,10 @@ public class CIMShady extends IterativeRobot {
     //LRButton Debounce
     boolean lastL_ButtonValue = false;
     boolean lastR_ButtonValue = false;
+    
+    //AXButton Debounce
+    boolean lastA_ButtonValue = false;
+    boolean lastX_ButtonValue = false;
     
 	//*Declaring robot parts*
 	//-Joystick
@@ -125,6 +134,8 @@ public class CIMShady extends IterativeRobot {
 	Solenoid solenoidOut;
 	Solenoid solenoidOpenClose;
 	
+	boolean current_SolOpenClose_value = false;
+	
 	//-Elevator
 	Elevator elevator;
 	
@@ -141,17 +152,21 @@ public class CIMShady extends IterativeRobot {
 	//-Treemap for Elevator Levels
 //	TreeMap<Integer, Double> levels;
 	//0 is starting level
-	Integer currentLevel = 0;
+	int currentLevel = 0;
 	
 	AnalogInput pressureSensor;
 	
-	int[] levels;
+	double[] levels = {0, 8, 16, 24, 32, 40, 45};
+	//Low sensor is about 6 inches, high is about 43 inches
 	
     public void robotInit() {
 
     	//Joystick
     	joy1 = new Joystick(JOY1_INT);
-    	joy2 = new Joystick(JOY2_INT);
+    	if(SINGLE_JOYSTICK_IS_BEST_JOYSTICK)
+    		joy2 = joy1;
+    	else
+    		joy2 =  new Joystick(JOY2_INT);
     	
     	//Motors
     	frontLeftMotor = new VictorSP(LEFTROBOT_FRONTMOTOR_ID);
@@ -180,11 +195,13 @@ public class CIMShady extends IterativeRobot {
 		pressureSensor = new AnalogInput(PRESSURE_SENSOR_ID);
 		
 		//Elevator
-		solenoidIn = new Solenoid(2, 1);
-		solenoidOut = new Solenoid(2, 2);
+		solenoidIn = new Solenoid(2, 2);
+		solenoidOut = new Solenoid(2, 1);
     	solenoidOpenClose = new Solenoid(2, 0);
-    	elevator = new Elevator(ELEVATOR_MOTOR_ID, ELEVATOR_P, ELEVATOR_I, ELEVATOR_D, ENCODER_A, ENCODER_B, BOTTOM_SENSOR_ID, TOP_SENSOR_ID);
+    	elevator = new Elevator(ELEVATOR_MOTOR_ID, ELEVATOR_P, ELEVATOR_I, ELEVATOR_D, ENCODER_A, ENCODER_B, BOTTOM_SENSOR_ID, TOP_SENSOR_ID, MIDDLE_SENSOR_ID, RIGHT_DISTANCE_ID, LEFT_DISTANCE_ID);
 		elevator.enable();
+		elevator.setSetpoint(levels[currentLevel]);
+		elevator.setIsRetracted(true);
     	
 //    	levels = new TreeMap<Integer, Double>();
 //    	levels.put(0, (double) 0);
@@ -195,13 +212,6 @@ public class CIMShady extends IterativeRobot {
     	
     	lidar = new LIDAR();
     	lidar.start();
-    	
-    	levels = new int[5];
-    	levels[0] = 0;
-    	levels[1] = 625;
-    	levels[2] = 1250;
-    	levels[3] = 1875;
-    	levels[4] = 2500;
     	
     	SmartDashboard.putNumber("Autonomous Mode:", autonomousMode);
     }
@@ -249,7 +259,15 @@ public class CIMShady extends IterativeRobot {
      */
     public void teleopPeriodic() {
     	
-    	System.out.println("Lidar = " + lidar.getDistanceIn());
+    	if(joy2.getRawButton(XBOX_LSTICK_BUTTON) && joy2.getRawButton(XBOX_RSTICK_BUTTON) && !elevator.isRetracted)
+    	{
+    		elevator.disable();
+    		Elev_PID = false;
+    		goDown = true;
+    		elevator.setMotorSpeed(-0.5);
+    	}
+    	
+    	SmartDashboard.putNumber("Lidar", lidar.getDistanceIn());
     	
     	//acquire gyroscope value, convert to radians, wrap to proper range
     	gyroValue = (gyro.get_gyro_angle()*(Math.PI/180)) % (2*Math.PI);
@@ -264,58 +282,78 @@ public class CIMShady extends IterativeRobot {
     	if(!slideTrain.getPIDController().isEnable())
     		gyro.reset_gyro_angle();
     		
-    	if(joy1.getRawButton(1))
+    	if(joy2.getRawButton(XBOX_A_BUTTON) && !lastA_ButtonValue && !elevator.isRetracted && elevator.isAbove)
     	{
     		solenoidIn.set(true);
     		solenoidOut.set(false);
+    		elevator.setIsRetracted(true);
     	}
-    	else if(joy1.getRawButton(2) && elevator.returnPIDInput() > MIN_RETRACT_HEIGHT && !solenoidOpenClose.get())
+    	else if(joy2.getRawButton(XBOX_A_BUTTON) && elevator.getIsAbove() && elevator.isRetracted && !lastA_ButtonValue)
     	{
     		solenoidIn.set(false);
     		solenoidOut.set(true);
+    		elevator.setIsRetracted(false);
+    		
     	}
-    	if(joy1.getRawButton(3))
+    	if(joy2.getRawButton(XBOX_X_BUTTON) && !lastX_ButtonValue)
     	{
-    		solenoidOpenClose.set(true);
+    		solenoidOpenClose.set(!current_SolOpenClose_value);
+    		current_SolOpenClose_value = !current_SolOpenClose_value;
     	}
-    	else if(joy1.getRawButton(4))
+//    	else if(joy1.getRawButton(XBOX_X_BUTTON) && !lastX_ButtonValue && solenoidOpenClose.get())
+//    	{
+//    		solenoidOpenClose.set(false);
+//    	}
+    	
+    	if(elevator.bottomSensor.get() && !elevator.lastState && elevator.elevatorOutput < 0)
     	{
-    		solenoidOpenClose.set(false);
+    		elevator.getPIDController().reset();
+    		elevator.raw_encoder_bottom_offset = -elevator.get_raw_encoder();
+    		elevator.setSetpoint(0);
+    		//elevator.encoder.reset();
+    		goDown = false;
+    		currentLevel = 0;
+    		Elev_PID = true;
+    		elevator.getPIDController().enable();
+    	}
+    	if(joy2.getRawButton(XBOX_RIGHT_BUTTON) && !lastR_ButtonValue && currentLevel < (levels.length - 1) && Elev_PID)
+    	{
+    		elevator.setSetpoint(levels[currentLevel + 1]);
+			currentLevel = currentLevel + 1;
+			goDown = false;
+    	}
+    	else if(joy2.getRawButton(XBOX_LEFT_BUTTON) && !lastL_ButtonValue && Elev_PID && 
+    			((currentLevel > 0 && !elevator.isRetracted) || (currentLevel > MIN_RETRACTED_LEVEL)))
+    	{
+    		elevator.setSetpoint(levels[currentLevel - 1]);
+			currentLevel = currentLevel - 1;
+			goDown = false;
     	}
     	
-//    	if(joy1.getRawButton(XBOX_RIGHT_BUTTON) && !lastR_ButtonValue && currentLevel >= 0 && Elev_PID)
-//    	{
-//    		elevator.setSetpoint(levels[currentLevel + 1]);
-//    		if(currentLevel > 0)
-//    		{
-//    			currentLevel = currentLevel + 1;
-//    		}
-//    	}
-//    	else if(joy1.getRawButton(XBOX_LEFT_BUTTON) && !lastL_ButtonValue && currentLevel >= 0)
-//    	{
-//    		elevator.setSetpoint(levels[currentLevel - 1]);
-//    		if(currentLevel > 0)
-//    		{
-//    			currentLevel = currentLevel - 1;
-//    		}
-//    	}
-//    	else
-    	if(joy1.getRawButton(XBOX_SELECT_BUTTON) && joy1.getRawButton(XBOX_START_BUTTON))
+    	if(joy2.getRawButton(XBOX_SELECT_BUTTON) && joy2.getRawButton(XBOX_START_BUTTON))
     	{
     		elevator.disable();
     		Elev_PID = false;
+    		goDown = false;
     	}
-    	else if(joy1.getRawButton(XBOX_RIGHT_BUTTON) && !Elev_PID)
+    	else if(joy2.getRawButton(XBOX_RIGHT_BUTTON) && !Elev_PID)
     	{
-    		elevator.setMotorSpeed(0.55);
+    		elevator.setMotorSpeed(0.75);
+    		SmartDashboard.putNumber("Elevator Distance", elevator.encoder.getDistance());
+    		goDown = false;
     	}
-    	else if(joy1.getRawButton(XBOX_LEFT_BUTTON) && !Elev_PID)
+    	else if(joy2.getRawButton(XBOX_LEFT_BUTTON) && !Elev_PID)
     	{
-    		elevator.setMotorSpeed(-0.55);
+    		elevator.setMotorSpeed(-0.75);
+    		SmartDashboard.putNumber("Elevator Distance", elevator.getElevatorHeightIN());
+    		SmartDashboard.putNumber("Elevator Encoder Raw", elevator.encoder.getRaw());
+    		goDown = false;
     	}
-    	else if(!Elev_PID)
+    	else if(!Elev_PID && !goDown)
     	{
     		elevator.setMotorSpeed(0);
+    		SmartDashboard.putNumber("Elevator Distance", elevator.getElevatorHeightIN());
+    		SmartDashboard.putNumber("Elevator Encoder Raw", elevator.encoder.getRaw());	
     	}
     		
         
@@ -327,8 +365,11 @@ public class CIMShady extends IterativeRobot {
 		backLeftMotor.set(slideTrain.backLeftMotorValue);
 		slideMotor.set(slideTrain.slideMotorValue);
 		
-		lastR_ButtonValue = joy1.getRawButton(XBOX_RIGHT_BUTTON);
-		lastL_ButtonValue = joy1.getRawButton(XBOX_LEFT_BUTTON);
+		lastA_ButtonValue = joy2.getRawButton(XBOX_A_BUTTON);
+		lastX_ButtonValue = joy2.getRawButton(XBOX_X_BUTTON);
+		
+		lastR_ButtonValue = joy2.getRawButton(XBOX_RIGHT_BUTTON);
+		lastL_ButtonValue = joy2.getRawButton(XBOX_LEFT_BUTTON);
 		
 		//Spit some debug info out to the Riolog
 //		System.out.print("Front Right Motor: " + String.format( "%.2f", slideTrain.frontRightMotorValue) + " ");
@@ -337,7 +378,7 @@ public class CIMShady extends IterativeRobot {
 //		System.out.print("Back Left Motor: " + String.format( "%.2f", slideTrain.backLeftMotorValue) + " ");
 //		System.out.print("Slide Motor: " + String.format( "%.2f", slideTrain.slideMotorValue) + " ");
 //		System.out.println("Gyro: " + String.format( "%.2f", gyroValue) + " PID Value:" + String.format( "%.2f", slideTrain.PIDOutput));
-		SmartDashboard.putNumber("Pressure Voltage", pressureSensor.getAverageVoltage());
+		SmartDashboard.putNumber("Pressure", getPressurePSI(pressureSensor.getAverageVoltage()));
     }
     
     /**
@@ -347,4 +388,25 @@ public class CIMShady extends IterativeRobot {
     
     }
     
+    public double getPressurePSI(double voltage) {
+		return (voltage - 0.5) * (75 / 2);
+	}
+    
+	public int getDirectionToStrafe()
+	{
+		double elevatorDifference = elevator.getLeftDistance() - elevator.getRightDistance();
+		if(elevatorDifference < 1)
+			return 0;
+		else
+		{
+			if(elevatorDifference > 0)
+			{
+				return -1;
+			}
+			else
+			{
+				return 1;
+			}
+		}
+	}
 }

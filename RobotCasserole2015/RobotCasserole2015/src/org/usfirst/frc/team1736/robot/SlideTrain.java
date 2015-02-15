@@ -50,7 +50,7 @@ public class SlideTrain extends PIDSubsystem{
     
     Boolean needsToLoop = false;
     int numberOfLoops = 0;
-    final int PIDWaitLoop = 20;
+    final int PIDWaitLoop = 27;
     
     static double lastTime = 0;
 	
@@ -162,11 +162,15 @@ public class SlideTrain extends PIDSubsystem{
 		SmartDashboard.putNumber("Setpoint", setPoint);
 		SmartDashboard.putNumber("PIDOutput", PIDOutput);
 		SmartDashboard.putNumber("Gyro", gyroValue);
+		SmartDashboard.putNumber("Left Encoder Distance", leftEncoder.getDistance());
+		SmartDashboard.putNumber("Right Encoder Distance", rightEncoder.getDistance());
+		SmartDashboard.putNumber("Left Encoder Rate", leftEncoder.getRate());
+		SmartDashboard.putNumber("Right Encoder Rate", rightEncoder.getRate());
 		
 		//From deadzone to out of deadzone
 		if((previous_R_XAxis_value < 0.15 && previous_R_XAxis_value > -0.15) && (twistValue > 0.15 || twistValue < -0.15))
 		{
-			System.out.println("From deadzone to out of deadzone");
+			//System.out.println("From deadzone to out of deadzone");
 			getPIDController().reset();
 			needsToLoop = false;
 			numberOfLoops = 0;
@@ -174,13 +178,13 @@ public class SlideTrain extends PIDSubsystem{
 		//From out of deadzone to deadzone
 		else if((previous_R_XAxis_value > 0.15 || previous_R_XAxis_value < -0.15) && (twistValue < 0.15 && twistValue > -0.15))
 		{
-			System.out.println("From out of deadzone to deadzone");
+			//System.out.println("From out of deadzone to deadzone");
 			needsToLoop = true;
 		}		
 		
 		if(needsToLoop)
 		{
-			System.out.println("Needs to loop");
+			//System.out.println("Needs to loop");
 			numberOfLoops++;
 			if(numberOfLoops >= PIDWaitLoop)
 			{
@@ -331,5 +335,17 @@ public class SlideTrain extends PIDSubsystem{
 		getPIDController().reset();
 		getPIDController().enable();
 	}
+	
+    public void strafe(int direction)
+    {
+    	if(direction == 1)
+    		PIDarcadeDrive(Math.toRadians(270), 0.25, 0, true);
+    	else if(direction == -1)
+    		PIDarcadeDrive(Math.toRadians(90), 0.25, 0, true);
+    	else
+    		PIDarcadeDrive(0, 0, 0, true);
+        		
+    }
+    
 	
 }
