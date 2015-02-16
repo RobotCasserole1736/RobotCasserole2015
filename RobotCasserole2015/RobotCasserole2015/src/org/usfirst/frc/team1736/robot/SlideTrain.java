@@ -66,7 +66,9 @@ public class SlideTrain extends PIDSubsystem{
 		this.gyro = gyro;
 		
 		leftEncoder = new Encoder(leftEncoderID, leftEncoderID_2);
+		leftEncoder.setDistancePerPulse(0.073);
 		rightEncoder = new Encoder(rightEncoderID, rightEncoderID_2);
+		rightEncoder.setDistancePerPulse(0.073);
 		rightEncoder.setReverseDirection(true);
 		
 		//PID Subsystem stuff
@@ -74,6 +76,7 @@ public class SlideTrain extends PIDSubsystem{
 		                                        //this is allowable because rotation is continuous (as supposed to a slide motion)
 		getPIDController().setOutputRange(-1, 1); //we allow the output range to match that of the motor values
 		getPIDController().setInputRange(0, Math.PI*2); //Input is a full circle in radians
+		setPercentTolerance(5.0);
 	}
 	
 	//Open loop drive
@@ -237,7 +240,7 @@ public class SlideTrain extends PIDSubsystem{
 		}
 		else if(degrees <= 0)
 		{
-			setPoint = 360 - degrees;
+			setPoint = 360 + degrees;
 		}
 		
 		setSetpoint(Math.toRadians(setPoint));
@@ -263,21 +266,28 @@ public class SlideTrain extends PIDSubsystem{
         return num;
     }
 
-    public void driveStraight(double distance)
+    public boolean driveStraight(double distance)
     {
     	if(((leftEncoder.getDistance() >= distance) || (rightEncoder.getDistance() >= distance)))
     	{
     		PIDarcadeDrive(0, 0, 0, false);
+    		return true;
     	}
     	else if((leftEncoder.getDistance() > ((3/4) * distance)) || (rightEncoder.getDistance() > ((3/4) * distance))) 
     	
     	{
-    		PIDarcadeDrive(0, 0.4, 0, false);
+    		PIDarcadeDrive(0, 0.25, 0, false);
+    	}
+    	else if((leftEncoder.getDistance() > ((1/2) * distance)) || (rightEncoder.getDistance() > ((1/2) * distance))) 
+        	
+    	{
+    		PIDarcadeDrive(0, 0.5, 0, false);
     	}
     	else // if(leftEncoder.getDistance() < (distance / 2) || rightEncoder.getDistance() > (distance / 2))
     	{
-    		PIDarcadeDrive(0, .7, 0, false);
+    		PIDarcadeDrive(0, .75, 0, false);
     	}
+    	return false;
     }
     
     public void turnRight(double degrees)
@@ -346,6 +356,11 @@ public class SlideTrain extends PIDSubsystem{
     	else
     		PIDarcadeDrive(0, 0, 0, true);
         		
+    }
+    
+    public double pulsesToInches(int pulses)
+    {
+    	return pulses/13.6234;
     }
     
 	

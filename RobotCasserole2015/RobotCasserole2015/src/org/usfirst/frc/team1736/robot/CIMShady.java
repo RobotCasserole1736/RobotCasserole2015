@@ -67,13 +67,11 @@ public class CIMShady extends IterativeRobot {
 	
 	//PID Values
 	final static double P = 1.3;
-	final static double I = 0;//0.01;
+	final static double I = 0;
 	final static double D = 2.0;
-//	
-//	//PID Values
-//	final static double P = 0;
-//	final static double I = 0;
-//	final static double D = 0;
+	final static double AUTO_P = 0.35;
+	final static double AUTO_I = 0;
+	final static double AUTO_D = 0.5;
 
 	//-Elevator
 	final static int ELEVATOR_MOTOR_ID = 1;
@@ -156,8 +154,14 @@ public class CIMShady extends IterativeRobot {
 	
 	AnalogInput pressureSensor;
 	
-	double[] levels = {0, 8, 16, 24, 32, 40, 42.5};
+	double[] levels = {0, 10, 18, 32, 42.5};
 	//Low sensor is about 6 inches, high is about 43 inches
+	
+	//Autonomous Testing Variables
+	double straightDistance = 48;
+	double turnAngle = 90;
+	double currentStep = 0;
+	double stepTimer = 0;
 	
     public void robotInit() {
 
@@ -220,6 +224,7 @@ public class CIMShady extends IterativeRobot {
     	
     	SmartDashboard.getNumber("Autonomous Mode:");
     	slideTrain.lastTime = Timer.getFPGATimestamp();
+    	slideTrain.getPIDController().setPID(AUTO_P, AUTO_I, AUTO_D);
     	slideTrain.zeroAngle();
     	
     }
@@ -232,12 +237,28 @@ public class CIMShady extends IterativeRobot {
     	switch(autonomousMode)
     	{
     	case 0:
-    		slideTrain.driveStraight(458);
-    		frontRightMotor.set(-slideTrain.frontRightMotorValue);
-    		frontLeftMotor.set(slideTrain.frontLeftMotorValue);
-    		backRightMotor.set(-slideTrain.backRightMotorValue);
-    		backLeftMotor.set(slideTrain.backLeftMotorValue);
-    		slideMotor.set(slideTrain.slideMotorValue);
+    		if(currentStep == 0)
+    		{
+	    		if(slideTrain.driveStraight(straightDistance))
+	    		{
+	    			currentStep = 1;
+	    			//stepTimer = Timer.getFPGATimestamp();
+	    		}
+    		}
+    		else if(currentStep == 1)
+    		{
+    			slideTrain.turnRight(90);
+    			if(slideTrain.onTarget())
+    			{
+    				currentStep = 2;
+    				//Turning makes the encoder get off, so this "resets" it
+    				straightDistance = slideTrain.rightEncoder.getDistance() + 48;
+    			}
+    		}
+    		else if(currentStep == 2)
+    		{
+    			slideTrain.driveStraight(straightDistance);
+    		}
     		break;
     	case 1:
     		
@@ -250,6 +271,12 @@ public class CIMShady extends IterativeRobot {
     		
     		break;
     	}
+
+		frontRightMotor.set(-slideTrain.frontRightMotorValue);
+		frontLeftMotor.set(slideTrain.frontLeftMotorValue);
+		backRightMotor.set(-slideTrain.backRightMotorValue);
+		backLeftMotor.set(slideTrain.backLeftMotorValue);
+		slideMotor.set(slideTrain.slideMotorValue);
     	
     }
 
@@ -258,6 +285,7 @@ public class CIMShady extends IterativeRobot {
     	slideTrain.lastTime = Timer.getFPGATimestamp();
     	solenoidIn.set(false);
     	solenoidOut.set(false);
+    	slideTrain.getPIDController().setPID(P, I, D);
     	slideTrain.zeroAngle();
     	
     }
