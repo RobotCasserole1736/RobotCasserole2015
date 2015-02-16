@@ -45,9 +45,10 @@ public class Plant {
 	private double cur_motor_2_encoder_distance = 0;
 	private double cur_motor_3_encoder_distance = 0;
 	
+	//x_pos and y_pos are relative to a fixed origin on the field, placed wherever the robot starts
 	private double cur_robot_x_pos = 0;
 	private double cur_robot_y_pos = 0;
-	private double cur_robot_pose_angle = 0; //in radians?
+	private double cur_robot_pose_angle = 0; //in degrees
 	
 	//current sensor readings
 	private boolean elevator_bottom_sensor_state = false;
@@ -130,7 +131,7 @@ public class Plant {
 		else if (cur_elevator_motor_effort < 0)
 			cur_elevator_height += cur_elevator_motor_effort*ELEVATOR_MAX_UP_SPEED_IN_PER_SEC*time_delta;
 		
-		cur_elevator_height = limit_double(cur_elevator_height, ELEVATOR_MAX_HEIGHT_IN, ELEVATOR_MIN_HEIGHT_IN);
+		cur_elevator_height = limit_double(cur_elevator_height, ELEVATOR_MAX_HEIGHT_IN, ELEVATOR_MIN_HEIGHT_IN); //Limit cuz we trust Electrical and their limit switches
 		
 		//set elevator height sensors based on current height
 		//sensors will trigger whenever the elevator is within the magnetic sensor's detection range
@@ -160,7 +161,12 @@ public class Plant {
 		
 		
 		//check for broken robot
-		if(cur_arm_extension_distance != ARM_MAX_DISTANCE_IN)
+		if((cur_arm_extension_distance != ARM_MAX_DISTANCE_IN) && (cur_elevator_height < ELEVATOR_MID_SENSOR_POS_IN)){
+			System.out.println("!!!PLANT ERROR, ROBOT BROKEN: ARM HAS COLLIDED WITH BELLYPAN.");
+			System.out.println("-->Triggered because arm was not extended while elevator distance was below " + ELEVATOR_MID_SENSOR_POS_IN);
+			System.out.println("-->Arm at "+ cur_arm_extension_distance + "in, must be at least " + ARM_MAX_DISTANCE_IN);
+		}
+
 		
 		
 		
@@ -171,6 +177,22 @@ public class Plant {
 		double prev_time = time_of_last_call;
 		time_of_last_call = System.nanoTime()/1000000000;
 		double time_delta = prev_time - time_of_last_call;
+		
+		//Accumulate encoder distance value
+		cur_motor_1_encoder_distance += cur_motor_1_effort*DRIVETRAIN_MOTOR_1_MAX_TRAVERSAL_SPEED_FT_PER_SEC*time_delta;
+		cur_motor_2_encoder_distance += cur_motor_2_effort*DRIVETRAIN_MOTOR_2_MAX_TRAVERSAL_SPEED_FT_PER_SEC*time_delta;
+		cur_motor_3_encoder_distance += cur_motor_3_effort*DRIVETRAIN_MOTOR_3_MAX_TRAVERSAL_SPEED_FT_PER_SEC*time_delta;
+		
+		//Update current angle we're pointed at
+		cur_robot_pose_angle += DRIVETRAIN_ROTATE_RATE_SCALER_M12*(cur_motor_1_effort-cur_motor_2_effort) + DRIVETRAIN_ROTATE_RATE_SCALER_M3*cur_motor_3_effort;
+		
+		//drive in the direction of the angle that we're at. Assume any rotation induced by the motors was calculated above into the pose angle 
+		//This math is very flakey and probably not correct from a physics standpoint. It represents a VERY rough model of how the robot behaves.
+		cur_robot_x_pos += (cur_motor_1_effort+cur_motor_2_effort)/2*DRIVETRAIN_MOTOR_1_MAX_TRAVERSAL_SPEED_FT_PER_SEC*time_delta*Math.sin(cur_robot_pose_angle * Math.PI/180.0) + cur_motor_3_effort*DRIVETRAIN_MOTOR_3_MAX_TRAVERSAL_SPEED_FT_PER_SEC*time_delta*Math.cos(cur_robot_pose_angle * Math.PI/180.0);
+		cur_robot_y_pos += (cur_motor_1_effort+cur_motor_2_effort)/2*DRIVETRAIN_MOTOR_1_MAX_TRAVERSAL_SPEED_FT_PER_SEC*time_delta*Math.cos(cur_robot_pose_angle * Math.PI/180.0) - cur_motor_3_effort*DRIVETRAIN_MOTOR_3_MAX_TRAVERSAL_SPEED_FT_PER_SEC*time_delta*Math.sin(cur_robot_pose_angle * Math.PI/180.0);
+		
+		
+		
 		
 		
 		
