@@ -103,6 +103,7 @@ public class CIMShady extends IterativeRobot {
 	final static double MIN_RETRACTED_LEVEL = 1;
 	final static int LEFT_DISTANCE_ID = 6;
 	final static int RIGHT_DISTANCE_ID = 7;
+	final static int MIN_RETRACTED_HEIGHT = 10;
 	
 	boolean Elev_PID = true;
 	boolean goDown = false;
@@ -179,7 +180,6 @@ public class CIMShady extends IterativeRobot {
 	double turnAngle = 90;
 	double currentStep = 0;
 	double stepTimer = 0;
-	boolean autoWasRun = false;
 	
     public void robotInit() {
 
@@ -237,7 +237,6 @@ public class CIMShady extends IterativeRobot {
     	slideTrain.lastTime = Timer.getFPGATimestamp();
     	slideTrain.getPIDController().setPID(AUTO_P, AUTO_I, AUTO_D);
     	slideTrain.zeroAngle();
-    	autoWasRun = true;
     }
     
     /**
@@ -280,12 +279,14 @@ public class CIMShady extends IterativeRobot {
     		{
     			solenoidIn.set(true);
     			solenoidOut.set(false);
+    			elevator.setIsRetracted(true);
     			if(slideTrain.driveStraight(straightDistance))
     				currentStep = 3;
     		}
     		if(currentStep == 3)
     		{
     			solenoidOpenClose.set(true);
+    			current_SolOpenClose_value = true;
 	    		currentStep = 4;
 	    		stepTimer = Timer.getFPGATimestamp();
     		}
@@ -294,6 +295,7 @@ public class CIMShady extends IterativeRobot {
     			elevator.setSetpoint(11);
 	    		if(elevator.onTarget())
 	    		{
+	    			elevator.setIsAbove(true);
 	    			currentStep = 5;
 	    			stepTimer = Timer.getFPGATimestamp();
 	    		}
@@ -311,6 +313,7 @@ public class CIMShady extends IterativeRobot {
     		else if(currentStep == 6)
     		{
     			slideTrain.driveStraight(straightDistance);
+    			currentLevel = 1;
     		}
     		break;
     	case 1:
@@ -341,12 +344,6 @@ public class CIMShady extends IterativeRobot {
     	slideTrain.getPIDController().setPID(P, I, D);
     	slideTrain.zeroAngle();
     	
-    	if(!autoWasRun)
-    	{
-    		elevator.setIsRetracted(true);
-    		elevator.setIsAbove(false);
-    	}
-    	
 		if(enable_log){
 			String timeStamp = new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").format(new Date());
 			try {
@@ -364,8 +361,6 @@ public class CIMShady extends IterativeRobot {
 				log_open = false;
 			}
 		}
-		
-    	
     }
     
     /**
@@ -453,6 +448,18 @@ public class CIMShady extends IterativeRobot {
     		elevator.setSetpoint(levels[currentLevel - 1]);
 			currentLevel = currentLevel - 1;
 			goDown = false;
+    	}
+    	else if(joy2.getRawAxis(XBOX_LTRIGGER_AXIS) > 0.75 && Elev_PID && ((elevator.getElevatorHeightIN() > 0 && !elevator.isRetracted) || (elevator.getElevatorHeightIN() > MIN_RETRACTED_HEIGHT)))
+    	{
+    		elevator.setSetpoint(elevator.getElevatorHeightIN() - 0.4);
+    		if(elevator.getElevatorHeightIN() <= levels[currentLevel - 1])
+    			currentLevel--;
+    	}
+    	else if(joy2.getRawAxis(XBOX_RTRIGGER_AXIS) > 0.75 && Elev_PID && elevator.getElevatorHeightIN() < elevator.MAX_HEIGHT)
+    	{
+    		elevator.setSetpoint(elevator.getElevatorHeightIN() + 0.5);
+    		if(elevator.getElevatorHeightIN() >= levels[currentLevel + 1])
+    			currentLevel++;
     	}
     	
     	if(joy2.getRawButton(XBOX_SELECT_BUTTON) && joy2.getRawButton(XBOX_START_BUTTON))
