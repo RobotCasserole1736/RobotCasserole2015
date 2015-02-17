@@ -1,6 +1,13 @@
 
 package org.usfirst.frc.team1736.robot;
 
+import java.io.BufferedWriter;
+import java.io.FileNotFoundException;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.TreeMap;
 
 import edu.wpi.first.wpilibj.AnalogInput;
@@ -31,10 +38,20 @@ public class CIMShady extends IterativeRobot {
      */
 	//*Constants*
 	
+	///////////////////////////////////////////////////////////////////////////////
+	//Log objects
+	///////////////////////////////////////////////////////////////////////////////
+	
+	BufferedWriter log;
+	String filename = "/usr/local/logs/gyro_log";
+	boolean enable_log = true;
+	boolean log_open = false;
+	
+	
 	//-Component IDS
 	final static int JOY1_INT = 0;
 	final static int JOY2_INT = 1;
-	final static boolean SINGLE_JOYSTICK_IS_BEST_JOYSTICK = true;
+	final static boolean SINGLE_JOYSTICK_IS_BEST_JOYSTICK = false;
 	
 	final static int LEFTROBOT_FRONTMOTOR_ID = 0;
 	final static int LEFTROBOT_BACKMOTOR_ID = 1;
@@ -63,7 +80,7 @@ public class CIMShady extends IterativeRobot {
 	final static int XBOX_RSTICK_YAXIS = 5;
 	
 	//-Slide Correction Tuning Value
-	final static double slideTune = .4;
+	final static double slideTune = .5;
 	
 	//PID Values
 	final static double P = 1.3;
@@ -99,7 +116,7 @@ public class CIMShady extends IterativeRobot {
     final static int PRESSURE_SENSOR_ID = 2;
 	
     //-Closed/Open Loop
-    final static boolean openLoop = false;
+    final static boolean openLoop = true;
 	
     //-Autonomous mode
     int autonomousMode = 0;
@@ -288,12 +305,42 @@ public class CIMShady extends IterativeRobot {
     	slideTrain.getPIDController().setPID(P, I, D);
     	slideTrain.zeroAngle();
     	
+		if(enable_log){
+			String timeStamp = new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").format(new Date());
+			try {
+				log = new BufferedWriter(new FileWriter(filename+timeStamp+".csv"));
+				log.write("Initalized log at " + timeStamp);
+				log.newLine();
+				log_open = true;
+			} catch (FileNotFoundException e) {
+				e.printStackTrace();
+				System.out.println("ERROR COULD NOT OPEN GYRO LOG FILE");
+				log_open = false;
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+				log_open = false;
+			}
+		}
+		
+    	
     }
     
     /**
      * This function is called periodically during operator control
      */
     public void teleopPeriodic() {
+		if(log_open){
+			try {
+				log.write(""+Timer.getFPGATimestamp()+",");
+				log.write(""+gyro.get_gyro_z()+",");
+				log.write(""+gyro.get_gyro_status()+",\n");
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+    	
     	
     	if(joy2.getRawButton(XBOX_LSTICK_BUTTON) && joy2.getRawButton(XBOX_RSTICK_BUTTON) && !elevator.isRetracted)
     	{
@@ -415,6 +462,20 @@ public class CIMShady extends IterativeRobot {
 //		System.out.print("Slide Motor: " + String.format( "%.2f", slideTrain.slideMotorValue) + " ");
 //		System.out.println("Gyro: " + String.format( "%.2f", gyroValue) + " PID Value:" + String.format( "%.2f", slideTrain.PIDOutput));
 		SmartDashboard.putNumber("Pressure", getPressurePSI(pressureSensor.getAverageVoltage()));
+    }
+    
+    public void disabledPeriodic(){
+    	if(log_open){
+    		log_open = false;
+    		try {
+				log.close();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+    	}
+
+    	
     }
     
     /**

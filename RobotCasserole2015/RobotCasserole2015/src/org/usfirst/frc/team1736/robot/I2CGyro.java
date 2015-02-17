@@ -4,7 +4,7 @@
 //
 // CLASS NAME: I2CGyro
 // DESCRIPTION: I2C Gyro class - driver for L3G4200D MEMS Gyro
-// 				Includes filtering and discrete integral for angle calculation.
+// 				Includes filtering and descrete integral for angle calculation.
 //
 // NOTES: Multithreaded support. Initializing the gyro kicks off a periodic
 //        read function which asynchronously reads from they gyro in the
@@ -74,6 +74,25 @@ public class I2CGyro {
 	private static final int OUTZ_L_REG_ADDR = 0x2C;
 	private static final int OUTZ_H_REG_ADDR = 0x2D;
 	
+	//desired gyro settings
+	//See the datasheet, pages 29-43 to see exactly what each bit is doing.
+	//The basic gist of what is accomplished with each write is specified below
+	//but the datasheet will give you specifics on how it's accomplished.
+	
+	//Set output data rate to 400 and LPF cutoff to 25Hz
+	//Enable only Z axis, and disable power down.
+	//Yes, this is one of these devices which defaults to powered off.
+	//It's stupid.
+	private static final int CTRL_REG1_CONTENTS = 0b10011100;
+	//enable High Pass Filter, cutoff at 0.5 Hz
+	private static final int CTRL_REG2_CONTENTS = 0b00100110;
+	//Disable all interrupt trigger pins
+	private static final int CTRL_REG3_CONTENTS = 0b00000000;
+	//Set Full-Scale range to 2000Deg/Sec
+	private static final int CTRL_REG4_CONTENTS = 0b00100000;
+	//Disable Onboard FIFO
+	private static final int CTRL_REG5_CONTENTS = 0b00000000;
+	
 	//In order to use this variable, bitwise OR it with the first register
 	//you want to read from, and then read multiple bytes.
 	private static final int AUTO_INCRIMENT_REG_PTR_MASK = 0x80;
@@ -107,10 +126,14 @@ public class I2CGyro {
 	private final short gyro_max_limit = 0x7FB0; //directly in bits, same scale as gyro's registers
 	
 	//Deadzone 
-	public static final double gyro_deadzone = 0.01; //(in deg/sec)
+	public static final double gyro_deadzone = 0.1; //(in deg/sec)
 	
 	//Conversion factor from bits to degrees per sec
 	private static final double degPerSecPerLSB = 0.07;
+	
+	//False when gyro values are not to be considered good
+	//true when gyro values are known to be reasonable. I guess...
+	private boolean gyro_status = false;
 	
 	private long system_time_at_last_call = 0;
 	
@@ -316,27 +339,11 @@ public class I2CGyro {
 		}
 		
 		//Control register setup
-		//See the datasheet, pages 29-43 to see exactly what each bit is doing.
-		//The basic gist of what is accomplished with each write is specified below
-		//but the datasheet will give you specifics on how it's accomplished.
-		
-		//Set output data rate to 400 and LPF cutoff to 25Hz
-		//Enable only Z axis, and disable power down.
-		//Yes, this is one of these devices which defaults to powered off.
-		//It's stupid.
-		gyro.write(CTRL_REG1_ADDR, 0b10011100);
-		
-		//enable High Pass Filter, cutoff at 0.5 Hz
-		gyro.write(CTRL_REG2_ADDR, 0b00100110);
-		
-		//Disable all interrupt trigger pins
-		gyro.write(CTRL_REG3_ADDR, 0b00000000);
-		
-		//Set Full-Scale range to 2000Deg/Sec
-		gyro.write(CTRL_REG4_ADDR, 0b00100000);
-
-		//Disable Onboard FIFO
-		gyro.write(CTRL_REG5_ADDR, 0b00000000);
+		gyro.write(CTRL_REG1_ADDR, CTRL_REG1_CONTENTS);
+		gyro.write(CTRL_REG2_ADDR, CTRL_REG2_CONTENTS);
+		gyro.write(CTRL_REG3_ADDR, CTRL_REG3_CONTENTS);
+		gyro.write(CTRL_REG4_ADDR, CTRL_REG4_CONTENTS);
+		gyro.write(CTRL_REG5_ADDR, CTRL_REG5_CONTENTS);
 		
 		//sleep breifly to ensure settings take effect
 		//probably not actually required, but doesn't hurt either
@@ -399,6 +406,10 @@ public class I2CGyro {
 		angle = 0;		
 	}
 	
+	public synchronized boolean get_gyro_status(){
+		return gyro_status;
+	}
+	
 	///////////////////////////////////////////////////////////////////////////////
 	//Private Methods
 	///////////////////////////////////////////////////////////////////////////////
@@ -407,8 +418,32 @@ public class I2CGyro {
 	//Assumes all I2C communication initialization has been already done.
 	private synchronized short read_gyro_z_reg(){
 		byte[] buffer_low_and_high_bytes = {0, 0}; //buffer for I2C to read into
-		//read high and low bytes from I2C
-		gyro.read(OUTZ_L_REG_ADDR|AUTO_INCRIMENT_REG_PTR_MASK, 2, buffer_low_and_high_bytes); 
+		byte[] buffer_config_test_vals = {0}; // buffer to test the config values to make sure we didn't hit brownout
+		
+		//test gyro status by first reading from the first config register. 
+		gyro.read(CTRL_REG1_ADDR, 1, buffer_config_test_vals);
+		if(buffer_config_test_vals[0] == (byte)CTRL_REG1_CONTENTS){
+			//gyro is properly configured
+			//read high and low bytes from I2C
+			gyro.read(OUTZ_L_REG_ADDR|AUTO_INCRIMENT_REG_PTR_MASK, 2, buffer_low_and_high_bytes);
+			gyro_status = true; //a good read has occured. probably.
+		}
+		else {//gyro read was bad. Set buffer to zeros and try to reinitalize
+			gyro_status = false; //gyro value not ok!!!
+			System.out.println("ERROR BAD READ FROM GYRO. Got " + buffer_config_test_vals[0] + " for CtrlReg1, expected " + CTRL_REG1_CONTENTS);
+			System.out.println("attempting full I2C Reset...");
+			gyro.free();
+			gyro = new I2C(Port.kOnboard, I2C_ADDR); 
+			//Control register setup
+			gyro.write(CTRL_REG1_ADDR, CTRL_REG1_CONTENTS);
+			gyro.write(CTRL_REG2_ADDR, CTRL_REG2_CONTENTS);
+			gyro.write(CTRL_REG3_ADDR, CTRL_REG3_CONTENTS);
+			gyro.write(CTRL_REG4_ADDR, CTRL_REG4_CONTENTS);
+			gyro.write(CTRL_REG5_ADDR, CTRL_REG5_CONTENTS);
+			buffer_low_and_high_bytes[0] = 0;
+			buffer_low_and_high_bytes[1] = 0;
+			
+		}
 		//The desired 16-bit reading is split into two eight-bit bytes in memory and over I2C com's. This line just recombines those
 		//two bytes into a 16bit number, and applies the zero-motion-offset.
 		//Typecasting magic here, don't touch!
@@ -416,7 +451,7 @@ public class I2CGyro {
 		//Detect if the gyro has exceeded its measurement range
 		//If so, print a debugging message.
 		if(ret_val > gyro_max_limit || ret_val < -gyro_max_limit)
-			System.out.println("!!!!!WARNING GYRO VALUE HAS OVERLOADED!!!!!!!!!!");
+			System.out.println("!WARNING GYRO VALUE HAS OVERLOADED!!!!!!!!!!");
 		return (ret_val); //return assembled 16-bit result
 		
 	}
