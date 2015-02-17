@@ -124,6 +124,11 @@ public class Elevator extends PIDSubsystem
 		final double Tote3Height = 3.0;
 	}
 	
+	public void setIsAbove(boolean value)
+	{
+		isAbove = value;
+	}
+	
 	public boolean getIsAbove()
 	{
 		return isAbove;
@@ -138,7 +143,6 @@ public class Elevator extends PIDSubsystem
 	{
 		motor.set(speed);
 		elevatorOutput = speed;
-//		motor.set(0);
 	}
 	
 	public static double getDistanceCM (double voltage){

@@ -341,7 +341,12 @@ public class SlideTrain extends PIDSubsystem{
 	
 	public void zeroAngle()
 	{
-		setPoint = gyro.get_gyro_angle();
+		double gyroAngle = gyro.get_gyro_angle();
+		if(gyroAngle < 0)
+			gyroAngle = 360 + gyroAngle % 360;
+		else
+			gyroAngle = gyroAngle % 360;
+		setPoint = gyroAngle;
 		setSetpoint(Math.toRadians(setPoint));
 		getPIDController().reset();
 		getPIDController().enable();

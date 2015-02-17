@@ -51,7 +51,7 @@ public class CIMShady extends IterativeRobot {
 	//-Component IDS
 	final static int JOY1_INT = 0;
 	final static int JOY2_INT = 1;
-	final static boolean SINGLE_JOYSTICK_IS_BEST_JOYSTICK = false;
+	final static boolean SINGLE_JOYSTICK_IS_BEST_JOYSTICK = true;
 	
 	final static int LEFTROBOT_FRONTMOTOR_ID = 0;
 	final static int LEFTROBOT_BACKMOTOR_ID = 1;
@@ -116,7 +116,7 @@ public class CIMShady extends IterativeRobot {
     final static int PRESSURE_SENSOR_ID = 2;
 	
     //-Closed/Open Loop
-    final static boolean openLoop = true;
+    final static boolean openLoop = false;
 	
     //-Autonomous mode
     int autonomousMode = 0;
@@ -175,10 +175,11 @@ public class CIMShady extends IterativeRobot {
 	//Low sensor is about 6 inches, high is about 43 inches
 	
 	//Autonomous Testing Variables
-	double straightDistance = 48;
+	double straightDistance = 25;
 	double turnAngle = 90;
 	double currentStep = 0;
 	double stepTimer = 0;
+	boolean autoWasRun = false;
 	
     public void robotInit() {
 
@@ -224,13 +225,6 @@ public class CIMShady extends IterativeRobot {
 		elevator.setSetpoint(levels[currentLevel]);
 		elevator.setIsRetracted(true);
     	
-//    	levels = new TreeMap<Integer, Double>();
-//    	levels.put(0, (double) 0);
-//    	levels.put(1, (double) 625);
-//    	levels.put(2, (double) 1250);
-//    	levels.put(3, (double) 1875);
-//    	levels.put(4, (double) 2500);
-    	
     	lidar = new LIDAR();
     	lidar.start();
     	
@@ -243,36 +237,78 @@ public class CIMShady extends IterativeRobot {
     	slideTrain.lastTime = Timer.getFPGATimestamp();
     	slideTrain.getPIDController().setPID(AUTO_P, AUTO_I, AUTO_D);
     	slideTrain.zeroAngle();
-    	
+    	autoWasRun = true;
     }
     
     /**
      * This function is called periodically during autonomous
      */
     public void autonomousPeriodic() {
+    	
+    	if(currentStep == 0) //Initialization/Zeroing
+    	{
+    		solenoidIn.set(false);
+    		solenoidOut.set(true);
+    		elevator.setIsRetracted(false);
+    		elevator.disable();
+    		elevator.setMotorSpeed(-0.75);
+    		if(elevator.bottomSensor.get())
+    		{
+    			elevator.getPIDController().reset();
+    			elevator.raw_encoder_bottom_offset = -elevator.get_raw_encoder();
+    			elevator.setSetpoint(0);
+        		currentLevel = 0;
+        		elevator.getPIDController().enable();
+        		currentStep = 1;
+        		stepTimer = Timer.getFPGATimestamp();
+    		}
+    	}
 
     	switch(autonomousMode)
     	{
-    	case 0:
-    		if(currentStep == 0)
+    	case 0: //barrel pickup only, currently assuming back enough to zero
+    		if(currentStep == 1)
     		{
-	    		if(slideTrain.driveStraight(straightDistance))
-	    		{
-	    			currentStep = 1;
-	    			//stepTimer = Timer.getFPGATimestamp();
-	    		}
-    		}
-    		else if(currentStep == 1)
-    		{
-    			slideTrain.turnRight(90);
-    			if(slideTrain.onTarget())
+    			elevator.setSetpoint(6);
+    			if(elevator.onTarget())
     			{
     				currentStep = 2;
-    				//Turning makes the encoder get off, so this "resets" it
-    				straightDistance = slideTrain.rightEncoder.getDistance() + 48;
+    				stepTimer = Timer.getFPGATimestamp();
     			}
     		}
-    		else if(currentStep == 2)
+    		if(currentStep == 2 && Timer.getFPGATimestamp() - stepTimer > 0.75)
+    		{
+    			solenoidIn.set(true);
+    			solenoidOut.set(false);
+    			if(slideTrain.driveStraight(straightDistance))
+    				currentStep = 3;
+    		}
+    		if(currentStep == 3)
+    		{
+    			solenoidOpenClose.set(true);
+	    		currentStep = 4;
+	    		stepTimer = Timer.getFPGATimestamp();
+    		}
+    		else if(currentStep == 4 && Timer.getFPGATimestamp() - stepTimer > 0.75)
+    		{
+    			elevator.setSetpoint(11);
+	    		if(elevator.onTarget())
+	    		{
+	    			currentStep = 5;
+	    			stepTimer = Timer.getFPGATimestamp();
+	    		}
+    		}
+    		else if(currentStep == 5 && Timer.getFPGATimestamp() - stepTimer > 0.75)
+    		{
+    			slideTrain.turnLeft(90);
+    			if(slideTrain.onTarget())
+    			{
+    				currentStep = 6;
+    				//Turning makes the encoder get off, so this "resets" it
+    				straightDistance = slideTrain.rightEncoder.getDistance() + 36;
+    			}
+    		}
+    		else if(currentStep == 6)
     		{
     			slideTrain.driveStraight(straightDistance);
     		}
@@ -304,6 +340,12 @@ public class CIMShady extends IterativeRobot {
     	solenoidOut.set(false);
     	slideTrain.getPIDController().setPID(P, I, D);
     	slideTrain.zeroAngle();
+    	
+    	if(!autoWasRun)
+    	{
+    		elevator.setIsRetracted(true);
+    		elevator.setIsAbove(false);
+    	}
     	
 		if(enable_log){
 			String timeStamp = new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").format(new Date());
