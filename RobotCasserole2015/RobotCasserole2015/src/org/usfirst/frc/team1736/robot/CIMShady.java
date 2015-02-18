@@ -79,6 +79,9 @@ public class CIMShady extends IterativeRobot {
 	final static int XBOX_RSTICK_XAXIS = 4;
 	final static int XBOX_RSTICK_YAXIS = 5;
 	
+	//-Controller D-Pad POV Hat
+	final static int XBOX_DPAD_POV = 0;
+	
 	//-Slide Correction Tuning Value
 	final static double slideTune = .5;
 	
@@ -117,7 +120,7 @@ public class CIMShady extends IterativeRobot {
     final static int PRESSURE_SENSOR_ID = 2;
 	
     //-Closed/Open Loop
-    final static boolean openLoop = false;
+    final static boolean openLoop = true;
 	
     //-Autonomous mode
     int autonomousMode = 0;
@@ -394,8 +397,28 @@ public class CIMShady extends IterativeRobot {
     	if(gyro.get_gyro_angle() < 0)
     		gyroValue += 2*Math.PI;
     	
+    	if(joy1.getPOV(XBOX_DPAD_POV) != -1)
+    	{
+    		int dpadVal = joy1.getPOV(XBOX_DPAD_POV);
+    		if(dpadVal == 0)
+    		{
+    			slideTrain.arcadeDrive(0.5, 0, 0, slideTune, true);
+    		}
+    		else if(dpadVal == 90)
+    		{
+    			slideTrain.arcadeDrive(0, 0, 0.8, slideTune, true);
+    		}
+    		else if(dpadVal == 180)
+    		{
+    			slideTrain.arcadeDrive(-0.5, 0, 0, slideTune, true);
+    		}
+    		else if(dpadVal == 270)
+    		{
+    			slideTrain.arcadeDrive(0, 0, -0.8, slideTune, true);
+    		}
+    	}
     	//Run either open- or closed-loop control, depending on what is requested
-    	if(!openLoop)
+    	else if(!openLoop)
     		slideTrain.PIDarcadeDrive(joy1.getDirectionRadians(), joy1.getMagnitude(), joy1.getRawAxis(XBOX_RSTICK_XAXIS), true);
     	else
     		slideTrain.arcadeDrive((-1 *joy1.getRawAxis(XBOX_LSTICK_YAXIS)), joy1.getRawAxis(XBOX_RSTICK_XAXIS), joy1.getRawAxis(XBOX_LSTICK_XAXIS), slideTune, true);
