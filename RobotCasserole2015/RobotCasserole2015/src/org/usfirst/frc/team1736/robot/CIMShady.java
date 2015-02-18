@@ -51,7 +51,7 @@ public class CIMShady extends IterativeRobot {
 	//-Component IDS
 	final static int JOY1_INT = 0;
 	final static int JOY2_INT = 1;
-	final static boolean SINGLE_JOYSTICK_IS_BEST_JOYSTICK = true;
+	final static boolean SINGLE_JOYSTICK_IS_BEST_JOYSTICK = false;
 	
 	final static int LEFTROBOT_FRONTMOTOR_ID = 0;
 	final static int LEFTROBOT_BACKMOTOR_ID = 1;
@@ -451,15 +451,17 @@ public class CIMShady extends IterativeRobot {
     	}
     	else if(joy2.getRawAxis(XBOX_LTRIGGER_AXIS) > 0.75 && Elev_PID && ((elevator.getElevatorHeightIN() > 0 && !elevator.isRetracted) || (elevator.getElevatorHeightIN() > MIN_RETRACTED_HEIGHT)))
     	{
-    		elevator.setSetpoint(elevator.getElevatorHeightIN() - 0.4);
-    		if(elevator.getElevatorHeightIN() <= levels[currentLevel - 1])
-    			currentLevel--;
+    		elevator.setSetpoint(elevator.getElevatorHeightIN() - 0.55);
+    		if(currentLevel > 0)
+    			if(elevator.getElevatorHeightIN() <= levels[currentLevel - 1])
+    				currentLevel--;
     	}
     	else if(joy2.getRawAxis(XBOX_RTRIGGER_AXIS) > 0.75 && Elev_PID && elevator.getElevatorHeightIN() < elevator.MAX_HEIGHT)
     	{
-    		elevator.setSetpoint(elevator.getElevatorHeightIN() + 0.5);
-    		if(elevator.getElevatorHeightIN() >= levels[currentLevel + 1])
-    			currentLevel++;
+    		elevator.setSetpoint(elevator.getElevatorHeightIN() + 0.7);
+    		if(currentLevel < levels.length-1)
+    			if(elevator.getElevatorHeightIN() >= levels[currentLevel + 1])
+    				currentLevel++;
     	}
     	
     	if(joy2.getRawButton(XBOX_SELECT_BUTTON) && joy2.getRawButton(XBOX_START_BUTTON))
