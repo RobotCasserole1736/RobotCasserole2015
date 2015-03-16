@@ -22,6 +22,7 @@ import edu.wpi.first.wpilibj.SpeedController;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.VictorSP;
 import edu.wpi.first.wpilibj.PIDSource.PIDSourceParameter;
+import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
 /**
@@ -151,9 +152,9 @@ public class CIMShady extends IterativeRobot {
 	//-Solenoids
 	Solenoid solenoidIn;
 	Solenoid solenoidOut;
-	Solenoid solenoidOpenClose;
+	Solenoid solenoidBinGrabber;
 	
-	boolean current_SolOpenClose_value = false;
+	boolean solenoidBinGrabberValue = false;
 	
 	//-Elevator
 	Elevator elevator;
@@ -179,10 +180,13 @@ public class CIMShady extends IterativeRobot {
 	//Low sensor is about 6 inches, high is about 43 inches
 	
 	//Autonomous Testing Variables
-	double straightDistance = 25;
+	double straightDistance = 16;
 	double turnAngle = 90;
 	double currentStep = 0;
 	double stepTimer = 0;
+	
+	SendableChooser autoChooser;
+	SendableChooser autoLockout;
 	
     public void robotInit() {
 
@@ -222,7 +226,7 @@ public class CIMShady extends IterativeRobot {
 		//Elevator
 		solenoidIn = new Solenoid(2, 2);
 		solenoidOut = new Solenoid(2, 1);
-    	solenoidOpenClose = new Solenoid(2, 0);
+    	solenoidBinGrabber = new Solenoid(2, 0);
     	elevator = new Elevator(ELEVATOR_MOTOR_ID, ELEVATOR_P, ELEVATOR_I, ELEVATOR_D, ENCODER_A, ENCODER_B, BOTTOM_SENSOR_ID, TOP_SENSOR_ID, MIDDLE_SENSOR_ID, RIGHT_DISTANCE_ID, LEFT_DISTANCE_ID);
 		elevator.enable();
 		elevator.setSetpoint(levels[currentLevel]);
@@ -231,7 +235,14 @@ public class CIMShady extends IterativeRobot {
     	lidar = new LIDAR();
     	lidar.start();
     	
-    	SmartDashboard.putNumber("Autonomous Mode:", autonomousMode);
+    	autoChooser = new SendableChooser();
+    	autoChooser.addDefault("Step Bin Pull", "0");
+    	autoChooser.addObject("Zero Only", "1");
+    	autoChooser.addObject("Do Nothing", "2");
+    	
+    	autoLockout = new SendableChooser();
+    	autoLockout.addDefault("Locked", "0");
+    	autoLockout.addObject("Unlocked", "1");
     }
 
     public void autonomousInit() {
@@ -240,6 +251,12 @@ public class CIMShady extends IterativeRobot {
     	slideTrain.lastTime = Timer.getFPGATimestamp();
     	slideTrain.getPIDController().setPID(AUTO_P, AUTO_I, AUTO_D);
     	slideTrain.zeroAngle();
+    	
+    	String autoLockoutStr = (String)autoLockout.getSelected();
+    	if(autoLockoutStr.equals("0"))
+    		autonomousMode = 0;
+    	else
+    		autonomousMode = Integer.parseInt((String)autoChooser.getSelected());
     }
     
     /**
@@ -247,80 +264,126 @@ public class CIMShady extends IterativeRobot {
      */
     public void autonomousPeriodic() {
     	
-    	if(currentStep == 0) //Initialization/Zeroing
-    	{
-    		solenoidIn.set(false);
-    		solenoidOut.set(true);
-    		elevator.setIsRetracted(false);
-    		elevator.disable();
-    		elevator.setMotorSpeed(-0.75);
-    		if(elevator.bottomSensor.get())
-    		{
-    			elevator.getPIDController().reset();
-    			elevator.raw_encoder_bottom_offset = -elevator.get_raw_encoder();
-    			elevator.setSetpoint(0);
-        		currentLevel = 0;
-        		elevator.getPIDController().enable();
-        		currentStep = 1;
-        		stepTimer = Timer.getFPGATimestamp();
-    		}
-    	}
+//    	if(currentStep == 0) //Initialization/Zeroing
+//    	{
+//    		solenoidIn.set(false);
+//    		solenoidOut.set(true);
+//    		elevator.setIsRetracted(false);
+//    		elevator.disable();
+//    		elevator.setMotorSpeed(-0.75);
+//    		if(elevator.bottomSensor.get())
+//    		{
+//    			elevator.getPIDController().reset();
+//    			elevator.raw_encoder_bottom_offset = -elevator.get_raw_encoder();
+//    			elevator.setSetpoint(0);
+//        		currentLevel = 0;
+//        		elevator.getPIDController().enable();
+//        		currentStep = 1;
+//        		stepTimer = Timer.getFPGATimestamp();
+//    		}
+//    	}
 
     	switch(autonomousMode)
     	{
-    	case 0: //barrel pickup only, currently assuming back enough to zero
+    	case 0: //Bin pull, zero elevator
+    		if(currentStep == 0)
+    		{
+    			if(slideTrain.driveStraight(straightDistance))
+    			{
+    				currentStep = 1;
+    				straightDistance = slideTrain.leftEncoder.getDistance() + 48;
+    				//note - left encoder is negative at this point after driving forward
+    			}
+    		}
     		if(currentStep == 1)
     		{
-    			elevator.setSetpoint(6);
-    			if(elevator.onTarget())
-    			{
-    				currentStep = 2;
-    				stepTimer = Timer.getFPGATimestamp();
-    			}
+    			solenoidBinGrabber.set(true);
+    			solenoidBinGrabberValue = true;
+				stepTimer = Timer.getFPGATimestamp();
+				currentStep = 2;
     		}
     		if(currentStep == 2 && Timer.getFPGATimestamp() - stepTimer > 0.75)
     		{
-    			solenoidIn.set(true);
-    			solenoidOut.set(false);
-    			elevator.setIsRetracted(true);
-    			if(slideTrain.driveStraight(straightDistance))
+    			if(slideTrain.driveBackwardsPull(straightDistance))
+    			{
     				currentStep = 3;
+    				solenoidBinGrabber.set(false);
+    				solenoidBinGrabberValue = false;
+    				straightDistance = straightDistance + 6;
+    			}
     		}
     		if(currentStep == 3)
     		{
-    			solenoidOpenClose.set(true);
-    			current_SolOpenClose_value = true;
-	    		currentStep = 4;
-	    		stepTimer = Timer.getFPGATimestamp();
-    		}
-    		else if(currentStep == 4 && Timer.getFPGATimestamp() - stepTimer > 0.75)
-    		{
-    			elevator.setSetpoint(11);
-	    		if(elevator.onTarget())
-	    		{
-	    			elevator.setIsAbove(true);
-	    			currentStep = 5;
-	    			stepTimer = Timer.getFPGATimestamp();
-	    		}
-    		}
-    		else if(currentStep == 5 && Timer.getFPGATimestamp() - stepTimer > 0.75)
-    		{
-    			slideTrain.turnLeft(90);
-    			if(slideTrain.onTarget())
+    			if(slideTrain.driveBackwardsPull(straightDistance))
     			{
-    				currentStep = 6;
-    				//Turning makes the encoder get off, so this "resets" it
-    				straightDistance = slideTrain.rightEncoder.getDistance() + 36;
+    				currentStep = 4;
+    				stepTimer = Timer.getFPGATimestamp();
     			}
+    			solenoidIn.set(false);
+        		solenoidOut.set(true);
+        		elevator.setIsRetracted(false);
     		}
-    		else if(currentStep == 6)
+    		if(currentStep == 4 && Timer.getFPGATimestamp() - stepTimer > 0.5)
     		{
-    			slideTrain.driveStraight(straightDistance);
+    			elevator.disable();
+        		elevator.setMotorSpeed(-0.75);
+        		if(elevator.bottomSensor.get())
+        		{
+        			elevator.getPIDController().reset();
+        			elevator.raw_encoder_bottom_offset = -elevator.get_raw_encoder();
+        			elevator.setSetpoint(0);
+            		currentLevel = 0;
+            		elevator.getPIDController().enable();
+            		currentStep = 5;
+        		}
+    		}
+    		if(currentStep == 5)
+    		{
+    			elevator.setSetpoint(levels[1]);
     			currentLevel = 1;
+    			elevator.setIsAbove(true);
+    			if(elevator.onTarget())
+    			{
+    				solenoidIn.set(true);
+    				solenoidOut.set(false);
+    				elevator.setIsRetracted(true);
+    			}
     		}
     		break;
     	case 1:
-    		
+    		if(currentStep == 0)
+    		{
+    			solenoidOut.set(true);
+        		elevator.setIsRetracted(false);
+        		stepTimer = Timer.getFPGATimestamp();
+        		currentStep = 1;
+    		}
+    		if(currentStep == 1 && Timer.getFPGATimestamp() - stepTimer > 1)
+    		{
+    			elevator.disable();
+        		elevator.setMotorSpeed(-0.75);
+        		if(elevator.bottomSensor.get())
+        		{
+        			elevator.getPIDController().reset();
+        			elevator.raw_encoder_bottom_offset = -elevator.get_raw_encoder();
+        			elevator.setSetpoint(0);
+            		currentLevel = 0;
+            		elevator.getPIDController().enable();
+            		currentStep = 2;
+        		}
+    		}
+    		if(currentStep == 2)
+    		{
+    			elevator.setSetpoint(levels[1]);
+    			currentLevel = 1;
+    			elevator.setIsAbove(true);
+    			if(elevator.onTarget())
+    			{
+    				solenoidIn.set(true);
+    				solenoidOut.set(false);
+    				elevator.setIsRetracted(true);
+    			}
+    		}
     		break;
     	case 2:
     		
@@ -440,8 +503,8 @@ public class CIMShady extends IterativeRobot {
     	}
     	if(joy2.getRawButton(XBOX_X_BUTTON) && !lastX_ButtonValue)
     	{
-    		solenoidOpenClose.set(!current_SolOpenClose_value);
-    		current_SolOpenClose_value = !current_SolOpenClose_value;
+    		solenoidBinGrabber.set(!solenoidBinGrabberValue);
+    		solenoidBinGrabberValue = !solenoidBinGrabberValue;
     	}
 //    	else if(joy1.getRawButton(XBOX_X_BUTTON) && !lastX_ButtonValue && solenoidOpenClose.get())
 //    	{

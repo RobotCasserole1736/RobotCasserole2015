@@ -290,6 +290,31 @@ public class SlideTrain extends PIDSubsystem{
     	return false;
     }
     
+    //This is for use during Auto when we're pulling bins off the step.  Quick backwards jerk/pull.
+    public boolean driveBackwardsPull(double distance)
+    {
+    	if(((leftEncoder.getDistance() >= distance) || (rightEncoder.getDistance() >= distance)))
+    	{
+    		PIDarcadeDrive(0, 0, 0, false);
+    		return true;
+    	}
+    	else if((leftEncoder.getDistance() > ((3/4) * distance)) || (rightEncoder.getDistance() > ((3/4) * distance))) 
+    	
+    	{
+    		PIDarcadeDrive(0, -0.25, 0, false);
+    	}
+    	else if((leftEncoder.getDistance() > ((1/2) * distance)) || (rightEncoder.getDistance() > ((1/2) * distance))) 
+        	
+    	{
+    		PIDarcadeDrive(0, -0.65, 0, false);
+    	}
+    	else // if(leftEncoder.getDistance() < (distance / 2) || rightEncoder.getDistance() > (distance / 2))
+    	{
+    		PIDarcadeDrive(0, -0.95, 0, false);
+    	}
+    	return false;
+    }
+    
     public void turnRight(double degrees)
     {
     	PIDTurning(degrees);
